@@ -21,7 +21,7 @@
   (rv (use lv)
       (lv ...)
       (const x) ; FIXME
-      (x rv ...)) ; struct instantiation or method call 
+      (x rv ...)) ; function call
   (type unit ; unit type
         i32
         bool)
@@ -69,7 +69,7 @@
                        ;; StorageDead(_8)
                        (switch _7 (0u8 bb3) (otherwise bb1)))))
 (define bb1-foo (term (bb1 (= _0 (const true)) (goto bb4))))
-(define bb2-foo (term (bb1 (= _0 (const false)) (goto bb4))))
+(define bb2-foo (term (bb2 (= _0 (const false)) (goto bb4))))
 (define bb3-foo (term (bb3
                        ;; StorageLive(_10)
                        ;; StorageLive(_11)

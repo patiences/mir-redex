@@ -18,7 +18,7 @@
   (lv x)
   (rv (lv ...)
       (const x) ; FIXME
-      (x rv ...)) ; struct instantiaion
+      (x rv ...)) ; function call
   (type unit ; unit type
         i32
         bool)
