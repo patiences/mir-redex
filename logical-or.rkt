@@ -27,7 +27,7 @@
         bool)
   (x variable-not-otherwise-mentioned))
 
-;; logical and  
+;; logical or  
 ;; ===================================================================
 (define _0-decl (term (let mut _0 unit)))
 (define _1-decl (term (let mut _1 bool)))
