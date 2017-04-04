@@ -27,7 +27,11 @@
   (vdecls (vdecl ...))
   ;; variable declaration, with mutability qualifier (immutable by default)
   (vdecl (x : type)
-         (mut x : type))
+         (mq x : type))
+
+  ;; mutability qualifier
+  (mq mut
+      imm)
   
   ;; scope
   ;;    l: label
@@ -50,6 +54,8 @@
   ;; terminator 
   (terminator ;; return to caller
               return
+              ;; emitted by diverge call during unwinding 
+              resume
               ;; switch on an integer, branching to bb l 
               (switchInt lv (const l) (otherwise l))
               ;; checked branch
@@ -61,7 +67,9 @@
               ;; branch to bb l on return 
               (call lv g rvs l)
               ;; go to bb l 
-              (goto l))
+              (goto l)
+              ;; drop the lv
+              (drop lv l))
 
   ;; lvalues
   (lvs (lv ...))
@@ -73,22 +81,26 @@
   ;; FIXME: Remove "structs"
   ;; FIXME: Combine tuples & structs into single "aggregate" value
   ;;        See http://manishearth.github.io/rust-internals-docs///rustc/mir/enum.Rvalue.html
+
   ;; rvalues
-  
   (rvs (rv ...))
   ;; rvalue 
   (rv ;; by-value use of lv 
-      (use lv)  
+      (use lv)
+      ;; references (borrows) 
+      (& borrowkind lv)
       ;; constants
       const
       ;; binary operations
       (binop rv rv)
       ;; unary operations
       (unop rv)
+      ;; vectors
+      (vec type len)
       ;; aggregate values
       (rv ...)
-      ;; downcast an lv
-      (lv as type)
+      ;; typecast 
+      (cast castkind lv as type)
       ;; structs
       ;;    s: struct name
       ;;    sts: assignments to struct variables 
@@ -107,6 +119,12 @@
   ;; unary operation kinds
   (unop ! -)
 
+  ;; cast kinds 
+  (castkind misc)
+
+  ;; borrow kinds
+  (borrowkind mut shared unique)
+
   ;; type
   (type ;; unit, i.e. () 
         unit-type
@@ -118,10 +136,17 @@
         ;; struct types 
         (struct s)
         ;; aggregate types
-        (type ...))
+        (type ...)
+        ;; vector type
+        (vec type len)
+        ;; type with qualifier
+        (& mq type))
 
   ;; error messages
   (msg string)
+
+  ;; vector length
+  (len integer)
 
   ;; variables 
   (x variable-not-otherwise-mentioned)

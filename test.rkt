@@ -97,11 +97,11 @@
 ;}
 
 (define not
-  (term (-> main [] unit-type
+  (term (-> main () unit-type
             (mut _0 : unit-type)
             (scope scope1 (_1 : bool))
             (bb bb0
-                [(= _1 (struct Not [#true])) 
+                [(= _1 (! #true)) 
                  (= _0 unit)]
                 return))))
 
@@ -214,7 +214,7 @@
                   (= _6 (use _3))
                   (= _8 (use _4))
                   (= _9 (use _6))
-                  (= _7 (struct Lt ((use _8) (use _9))))]
+                  (= _7 (< (use _8) (use _9)))]
                  (switchInt _10 ((0 u08) bb3) (otherwise bb1)))
              (bb bb1 [(= _1 #true)] (goto bb4))
              (bb bb2 [(= _1 #false)] (goto bb4))
@@ -270,7 +270,7 @@
 
 (check-not-false (redex-match mir fn tuple))
 
-;; Downcasting 
+;; Downcasting to integer
 ;; ======================================================
 ;fn main() -> () {
 ;    let mut _0: ();                      // return pointer
@@ -307,7 +307,7 @@
             (bb bb0
                 [(= _1 (1 f64))
                  (= _3 (use _1))
-                 (= _2 (_3 as i32))
+                 (= _2 (cast misc _3 as i32))
                  (= _3 unit)]
                 return))))
 
@@ -348,4 +348,67 @@
                         "attempt to add with overflow")))))
 
 (check-not-false (redex-match mir fn add))
-                
+
+
+;; Vector initialization 
+;; ======================================================
+;fn main() -> () {
+;    let mut _0: ();                      // return pointer
+;    scope 1 {
+;        let mut _1: std::vec::Vec<i32>;  // "vec" in scope 1 at <anon>:2:9: 2:16
+;    }
+;    let mut _2: ();
+;    let mut _3: ();
+;    let mut _4: &mut std::vec::Vec<i32>;
+;
+;    bb0: {
+;        StorageLive(_1);                 // scope 0 at <anon>:2:9: 2:16
+;        _1 = <std::vec::Vec<T>><i32>::new() -> bb1; // scope 0 at <anon>:2:30:2:40
+;    }
+;
+;    bb1: {
+;        StorageLive(_4);                 // scope 1 at <anon>:3:5: 3:8
+;        _4 = &mut _1;                    // scope 1 at <anon>:3:5: 3:8
+;        _3 = <std::vec::Vec<T>><i32>::push(_4, const 1i32) -> [return: bb4, unwind: bb3]; // scope 1 at <anon>:3:5: 3:16
+;    }
+;
+;    bb2: {
+;        resume;                          // scope 0 at <anon>:1:1: 4:2
+;    }
+;
+;    bb3: {
+;        drop(_1) -> bb2;                 // scope 0 at <anon>:4:2: 4:2
+;    }
+;
+;    bb4: {
+;        StorageDead(_4);                 // scope 1 at <anon>:3:16: 3:16
+;        _0 = ();                         // scope 1 at <anon>:1:11: 4:2
+;        drop(_1) -> bb5;                 // scope 0 at <anon>:4:2: 4:2
+;    }
+;
+;    bb5: {
+;        StorageDead(_1);                 // scope 0 at <anon>:4:2: 4:2
+;        return;                          // scope 0 at <anon>:4:2: 4:2
+;    }
+;}
+
+(define vec
+  (term (-> main () unit-type
+            (mut _0 : unit-type)
+            (scope scope1 (mut _1 : (vec i32 0)))
+            (mut _2 : unit-type)
+            (mut _3 : unit-type)
+            (mut _4 : (& mut (vec i32 0)))
+            (bb bb0 [] (call _1 <std::vec::Vec<T>><i32>::new () bb1))
+            (bb bb1 [(= _4 (& mut _1))] (call _3
+                                              <std::vec::Vec<T>><i32>::push
+                                              [(use _4)
+                                               (1 i32)]
+                                              bb4))
+            (bb bb2 [] resume)
+            (bb bb3 [] (drop _1 bb2))
+            (bb bb4 [(= _0 unit)] (drop _1 bb5))
+            (bb bb5 [] return))))
+
+(check-not-false (redex-match mir fn vec))
+            
