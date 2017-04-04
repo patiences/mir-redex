@@ -51,6 +51,8 @@
   (st  ;; single variable assignment 
        (= lv rv))
 
+  ;; TODO: add unwinding labels
+  
   ;; terminator 
   (terminator ;; return to caller
               return
@@ -78,8 +80,7 @@
       ;; projection (e.g. tuple access)
       (· lv f))
 
-  ;; FIXME: Remove "structs"
-  ;; FIXME: Combine tuples & structs into single "aggregate" value
+  ;; TODO: Consider combining tuples & structs & vectors into single "aggregate" value? 
   ;;        See http://manishearth.github.io/rust-internals-docs///rustc/mir/enum.Rvalue.html
 
   ;; rvalues
@@ -125,6 +126,8 @@
   ;; borrow kinds
   (borrowkind mut shared unique)
 
+  ;; TODO: can we drop num sizes?
+  
   ;; type
   (type ;; unit, i.e. () 
         unit-type
