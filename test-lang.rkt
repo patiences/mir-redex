@@ -43,9 +43,9 @@
 (define if-else-simple
   (term (-> main () unit-type
             (mut _0 : unit-type)
-            (scope scope1 (mut _1 : i32))
+            (scope scope1 (mut _1 : int))
             (bb bb0
-                [(= _1 (1 i32))
+                [(= _1 1)
                  (= _0 unit)]
                 return))))
 
@@ -72,8 +72,8 @@
             (mut _0 : unit-type)
             (scope scope1 (_1 : (struct Point)))
             (bb bb0
-                [(= _1 (struct Point [(= x (4 i32))
-                                      (= y (5 i32))]))
+                [(= _1 (struct Point [(= x 4)
+                                      (= y 5)]))
                  (= _0 unit)]
                 return))))
 
@@ -193,21 +193,21 @@
              (mut _0 : unit-type)
               (mut _1 : bool)
              (bb bb0 [] (call _1
-                               foo [(0 i32) (10 i32) (5 i32)]
+                               foo [0 10 5]
                                bb1))
               (bb bb1 [(= _0 unit)] return))
-         (-> foo [(_1 : i32) (_2 : i32) (_3 : i32)] bool
+         (-> foo [(_1 : int) (_2 : int) (_3 : int)] bool
              (mut _0 : unit-type)
              (scope scope1
-                    (_4 : i32)
-                    (_5 : i32)
-                    (_6 : i32))
+                    (_4 : int)
+                    (_5 : int)
+                    (_6 : int))
              (mut _7 : bool)
-             (mut _8 : i32)
+             (mut _8 : int)
              (mut _9 : bool)
-             (mut _10 : i32)
-             (mut _11 : i32)
-             (mut _12 : i32)
+             (mut _10 : int)
+             (mut _11 : int)
+             (mut _12 : int)
              (bb bb0
                  [(= _4 (use _1))
                   (= _5 (use _2))
@@ -215,13 +215,13 @@
                   (= _8 (use _4))
                   (= _9 (use _6))
                   (= _7 (< (use _8) (use _9)))]
-                 (switchInt _10 ((0 u08) bb3) (otherwise bb1)))
+                 (switchInt _10 (0 bb3) (otherwise bb1)))
              (bb bb1 [(= _1 #true)] (goto bb4))
              (bb bb2 [(= _1 #false)] (goto bb4))
              (bb bb3 [(= _11 (use _6))
                       (= _12 (use _5))
                       (= _10 (< (use _11) (use _12)))]
-                 (switchInt _10 ((0 u08) bb3) (otherwise bb1)))
+                 (switchInt _10 (0 bb3) (otherwise bb1)))
              (bb bb4 [] return))]))
 
 (check-not-false (redex-match mir prog logical-or))
@@ -257,12 +257,11 @@
   (term (-> main () unit-type
             (mut _0 : unit-type)
             (scope scope1
-                   (_1 : (i32 i32))
-                   (scope scope2 (_2 : i32)))
-            (mut _3 : i32)
+                   (_1 : (int int))
+                   (scope scope2 (_2 : int)))
+            (mut _3 : int)
             (bb bb0
-                [(= _1 ((1 i32) 
-                        (2 i32)))
+                [(= _1 (1 2))
                  (= _3 (use (· _1  0)))
                  (= _2 (use _3))
                  (= _0 unit)]
@@ -301,19 +300,19 @@
   (term (-> main () unit-type
             (mut _0 : unit-type)
             (scope scope1
-                   (_1 : f64)
-                   (scope scope2 (_2 : i32)))
-            (mut _3 : f64)
+                   (_1 : float)
+                   (scope scope2 (_2 : int)))
+            (mut _3 : float)
             (bb bb0
-                [(= _1 (1 f64))
+                [(= _1 1)
                  (= _3 (use _1))
-                 (= _2 (cast misc _3 as i32))
+                 (= _2 (cast misc _3 as int))
                  (= _3 unit)]
                 return))))
 
 (check-not-false (redex-match mir fn downcast))
 
-;; BinOp (Checked Addition)  
+;; BinOp (Unchecked Addition)  
 ;; ======================================================
 ;fn main() -> () {
 ;    let mut _0: ();                      // return pointer
@@ -339,10 +338,10 @@
 (define add
   (term (-> main () unit-type
             (mut _0 : unit-type)
-            (scope scope1 (_1 : i32))
-            (_2 : (i32 bool))
+            (scope scope1 (_1 : int))
+            (_2 : (int bool))
             (bb bb0
-                [(= _2 (+ (1 i32) (2 i32)))]
+                [(= _2 (+ 1 2))]
                 (assert (! (use (· _2 1)))
                         bb1
                         "attempt to add with overflow")))))
@@ -395,15 +394,15 @@
 (define vec
   (term (-> main () unit-type
             (mut _0 : unit-type)
-            (scope scope1 (mut _1 : (vec i32 0)))
+            (scope scope1 (mut _1 : (vec int 0)))
             (mut _2 : unit-type)
             (mut _3 : unit-type)
-            (mut _4 : (& mut (vec i32 0)))
-            (bb bb0 [] (call _1 <std::vec::Vec<T>><i32>::new () bb1))
+            (mut _4 : (& mut (vec int 0)))
+            (bb bb0 [] (call _1 <std::vec::Vec<T>><int>::new () bb1))
             (bb bb1 [(= _4 (& mut _1))] (call _3
-                                              <std::vec::Vec<T>><i32>::push
+                                              <std::vec::Vec<T>><int>::push
                                               [(use _4)
-                                               (1 i32)]
+                                               1]
                                               bb4))
             (bb bb2 [] resume)
             (bb bb3 [] (drop _1 bb2))
