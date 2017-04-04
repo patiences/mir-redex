@@ -74,6 +74,8 @@
       const
       ;; aggregate values
       (rv ...)
+      ;; downcast an lv
+      (lv as type)
       ;; structs
       ;;    s: struct name
       ;;    sts: assignments to struct variables 
@@ -95,6 +97,7 @@
         i32
         i64
         u08
+        f64
         bool
         ;; struct types 
         (struct s)
