@@ -51,7 +51,12 @@
   (terminator ;; return to caller
               return
               ;; switch on an integer, branching to bb l 
-              (switchInt lv (const l) ... (otherwise l))
+              (switchInt lv (const l) (otherwise l))
+              ;; checked branch
+              ;;    rv: condition
+              ;;    l: block to branch to, if rv evaluates to true
+              ;;    msg: error message 
+              (assert rv l msg)
               ;; lv gets the result of calling g with rvs as args
               ;; branch to bb l on return 
               (call lv g rvs l)
@@ -64,14 +69,22 @@
   (lv x
       ;; projection (e.g. tuple access)
       (· lv f))
-  
+
+  ;; FIXME: Remove "structs"
+  ;; FIXME: Combine tuples & structs into single "aggregate" value
+  ;;        See http://manishearth.github.io/rust-internals-docs///rustc/mir/enum.Rvalue.html
   ;; rvalues
+  
   (rvs (rv ...))
   ;; rvalue 
   (rv ;; by-value use of lv 
       (use lv)  
       ;; constants
       const
+      ;; binary operations
+      (binop rv rv)
+      ;; unary operations
+      (unop rv)
       ;; aggregate values
       (rv ...)
       ;; downcast an lv
@@ -79,10 +92,7 @@
       ;; structs
       ;;    s: struct name
       ;;    sts: assignments to struct variables 
-      (struct s sts)
-      ;; struct constants
-      (struct s (const ...))
-      (struct s (rv ...))) ;; FIXME how many kinds of structs do we have...?
+      (struct s sts))
 
   ;; constants (can be evaluated at compile time)
   (const boolean
@@ -90,6 +100,12 @@
          (number type)
          ;; unit values 
          unit)
+
+  ;; binary operation kinds
+  (binop + - * / % ^ & \| << >> == < <= != >= >)
+
+  ;; unary operation kinds
+  (unop ! -)
 
   ;; type
   (type ;; unit, i.e. () 
@@ -104,6 +120,9 @@
         ;; aggregate types
         (type ...))
 
+  ;; error messages
+  (msg string)
+
   ;; variables 
   (x variable-not-otherwise-mentioned)
   ;; field names
@@ -114,13 +133,4 @@
   (g variable-not-otherwise-mentioned)
   ;; struct names
   (s variable-not-otherwise-mentioned))
-              
-  
-  
-
-                 
-                 
-                 
-                 
-                 
-                 
+                

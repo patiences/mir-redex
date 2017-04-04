@@ -220,7 +220,7 @@
              (bb bb2 [(= _1 #false)] (goto bb4))
              (bb bb3 [(= _11 (use _6))
                       (= _12 (use _5))
-                      (= _10 (struct Lt ((use _11) (use _12))))]
+                      (= _10 (< (use _11) (use _12)))]
                  (switchInt _10 ((0 u08) bb3) (otherwise bb1)))
              (bb bb4 [] return))]))
 
@@ -312,3 +312,40 @@
                 return))))
 
 (check-not-false (redex-match mir fn downcast))
+
+;; BinOp (Checked Addition)  
+;; ======================================================
+;fn main() -> () {
+;    let mut _0: ();                      // return pointer
+;    scope 1 {
+;        let _1: i32;                     // "a" in scope 1 at <anon>:2:9: 2:10
+;    }
+;    let mut _2: (i32, bool);
+;
+;    bb0: {
+;        StorageLive(_1);                 // scope 0 at <anon>:2:9: 2:10
+;        _2 = CheckedAdd(const 1i32, const 2i32); // scope 0 at <anon>:2:13: 2:18
+;        assert(!(_2.1: bool), "attempt to add with overflow") -> bb1; // scope 0 at <anon>:2:13: 2:18
+;    }
+;
+;    bb1: {
+;        _1 = (_2.0: i32);                // scope 0 at <anon>:2:13: 2:18
+;        _0 = ();                         // scope 1 at <anon>:1:11: 3:2
+;        StorageDead(_1);                 // scope 0 at <anon>:3:2: 3:2
+;        return;                          // scope 0 at <anon>:3:2: 3:2
+;    }
+;}
+
+(define add
+  (term (-> main () unit-type
+            (mut _0 : unit-type)
+            (scope scope1 (_1 : i32))
+            (_2 : (i32 bool))
+            (bb bb0
+                [(= _2 (+ (1 i32) (2 i32)))]
+                (assert (! (use (· _2 1)))
+                        bb1
+                        "attempt to add with overflow")))))
+
+(check-not-false (redex-match mir fn add))
+                
