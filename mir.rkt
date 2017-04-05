@@ -25,13 +25,11 @@
   
   ;; variable declarations 
   (vdecls (vdecl ...))
-  ;; variable declaration, with mutability qualifier (immutable by default)
-  (vdecl (x : type)
-         (mq x : type))
+  (vdecl (x : type)                     ;; immutable (by default)
+         (mq x : type))                 ;; decl with mutability qualifier 
   
-  ;; mutability qualifier
-  (mq mut
-      imm)
+  ;; mutability qualifiers
+  (mq mut imm)
   
   ;; scope
   ;;    l: label
@@ -47,69 +45,44 @@
   
   ;; statements 
   (sts (st ...))
-  ;; statement
-  (st  ;; single variable assignment 
-   (= lv rv))
-    
+  (st (= lv rv))                        ;; single variable assignment 
+  
   ;; terminator 
-  (terminator ;; return to caller
-   return
-   ;; emitted by diverge call during unwinding 
-   resume
-   ;; switch on an integer, branching to bb l 
-   (switchInt lv (const l) ... (otherwise l))
-   ;; checked branch
-   ;;    rv: condition
-   ;;    l: block to branch to, if rv evaluates to true
-   ;;    msg: error message 
-   (assert rv l msg)
-   ;; assert with an unwinding label
-   (assert rv l l msg)
-   ;; lv gets the result of calling g with rvs as args
-   ;; branch to bb l on return 
-   (call lv g rvs l)
-   ;; call with an unwinding label 
-   (call lv g rvs l l)
-   ;; go to bb l 
-   (goto l)
-   ;; drop the lv
-   (drop lv l)
-   ;; drop with an unwinding label 
-   (drop lv l l))
+  (terminator return                    ;; return to caller
+              resume                    ;; emitted by diverge call during unwinding 
+              (switchInt lv             ;; switch on an integer, branching to bb l 
+                         (const l) ...
+                         (otherwise l))
+              (assert rv l msg)         ;; checked branch
+                                        ;;    rv: condition
+                                        ;;    l: block to branch to, if rv evals to true
+                                        ;;    msg: error message, if rv evals to false
+              (assert rv l l msg)       ;; as above, with extra unwinding label 
+              (call lv g rvs l)         ;; lv gets the result of calling g(rvs), branch to l on return  
+              (call lv g rvs l l)       ;; as above, with extra unwinding label  
+              (goto l)                  ;; goto l
+              (drop lv l)               ;; drop lv, goto l 
+              (drop lv l l))            ;; as above, with extra unwinding label 
   
   ;; lvalues
   (lvs (lv ...))
-  ;; lvalue 
   (lv x
-      ;; projection (e.g. tuple access)
-      (· lv f))
+      (· lv f))                         ;; projection (e.g. tuple access)
   
   ;; TODO: Consider combining tuples & structs & vectors into single "aggregate" value? 
   ;;        See http://manishearth.github.io/rust-internals-docs///rustc/mir/enum.Rvalue.html
   
   ;; rvalues
   (rvs (rv ...))
-  ;; rvalue 
-  (rv ;; by-value use of lv 
-   (use lv)
-   ;; references (borrows) 
-   (& borrowkind lv)
-   ;; constants
-   const
-   ;; binary operations
-   (binop rv rv)
-   ;; unary operations
-   (unop rv)
-   ;; vectors
-   (vec type len)
-   ;; aggregate values
-   (rv ...)
-   ;; typecast 
-   (cast castkind lv as type)
-   ;; structs
-   ;;    s: struct name
-   ;;    sts: assignments to struct variables 
-   (struct s sts))
+  (rv (use lv)                          ;; use lv  
+      (& borrowkind lv)                 ;; references (borrows)
+      const                             ;; constants
+      (binop rv rv)                     ;; binary operations 
+      (unop rv)                         ;; unary operations
+      (cast castkind lv as type)        ;; typecasts
+      (vec type len)                    ;; vectors 
+      (rv ...)                          ;; aggregate values (i.e. tuples)
+      (struct s sts))                   ;; structs, with name and body 
   
   ;; constants (can be evaluated at compile time)
   (const boolean
@@ -124,48 +97,41 @@
   (unop ! -)
   
   ;; cast kinds 
-  (castkind misc)
+  (castkind misc
+            reifyfp                     ;; ReifyFnPointer
+            closurefp                   ;; ClosureFnPointer 
+            unsafefp                    ;; UnsafeFnPointer
+            unsize)                     ;; Unsize 
   
   ;; borrow kinds
-  (borrowkind mut shared unique)
-    
+  (borrowkind shared unique mut)
+  
   ;; type
-  (type ;; unit, i.e. () 
-   unit-type
-   int
-   uint
-   float
-   bool
-   ;; struct types 
-   (struct s)
-   ;; aggregate types
-   (type ...)
-   ;; vector type
-   (vec type len)
-   ;; type with qualifier
-   (& mq type)
-   ;; box
-   (box type))
+  (type unit-type                       ;; i.e. ()
+        int uint float                  ;; numbers 
+        bool                            ;; booleans 
+        (struct s)                      ;; structs 
+        (type ...)                      ;; aggregate types (i.e. tuples) 
+        (vec type len)                  ;; vectors 
+        (& mq type)                     ;; types with qualifiers 
+        (box type))                     ;; boxes 
   
   ;; error messages
   (msg string)
   
-  ;; vector length
+  ;; vector length ;; FIXME: is this capacity or length? 
   (len integer)
   
-  ;; variables 
-  (x variable-not-otherwise-mentioned)
-  ;; field names
-  (f number)
-  ;; label
-  (l variable-not-otherwise-mentioned)
-  ;; function names
-  (g variable-not-otherwise-mentioned)
-  ;; struct names
-  (s variable-not-otherwise-mentioned))
+  (x variable-not-otherwise-mentioned)  ;; variables 
+  (f number)                            ;; field names
+  (g variable-not-otherwise-mentioned)  ;; function names
+  (l variable-not-otherwise-mentioned)  ;; labels (i.e. block names)
+  (s variable-not-otherwise-mentioned)) ;; struct names
 
+;; =========================================================
 ;; Evaluation
-;; ===========================================
+;; =========================================================
+
 (define-extended-language mir-e mir
   ;; Evaluation contexts 
   (C hole 
@@ -177,7 +143,7 @@
 
 (define reduce
   (reduction-relation
-   mir-e #:domain C 
+   mir-e  
    (--> (in-hole C (+ const_1 const_2))
         (in-hole C ,(+ (term const_1) (term const_2)))
         "+")
@@ -193,4 +159,3 @@
    (--> (in-hole C (/ const_1 const_2))
         (in-hole C ,(/ (term const_1) (term const_2)))
         "/")))
-   
