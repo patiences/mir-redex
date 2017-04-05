@@ -57,7 +57,7 @@
    ;; emitted by diverge call during unwinding 
    resume
    ;; switch on an integer, branching to bb l 
-   (switchInt lv (const l) (otherwise l))
+   (switchInt lv (const l) ... (otherwise l))
    ;; checked branch
    ;;    rv: condition
    ;;    l: block to branch to, if rv evaluates to true
@@ -143,7 +143,9 @@
    ;; vector type
    (vec type len)
    ;; type with qualifier
-   (& mq type))
+   (& mq type)
+   ;; box
+   (box type))
   
   ;; error messages
   (msg string)
