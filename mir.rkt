@@ -50,9 +50,7 @@
   ;; statement
   (st  ;; single variable assignment 
    (= lv rv))
-  
-  ;; TODO: add unwinding labels
-  
+    
   ;; terminator 
   (terminator ;; return to caller
    return
@@ -65,13 +63,19 @@
    ;;    l: block to branch to, if rv evaluates to true
    ;;    msg: error message 
    (assert rv l msg)
+   ;; assert with an unwinding label
+   (assert rv l l msg)
    ;; lv gets the result of calling g with rvs as args
    ;; branch to bb l on return 
    (call lv g rvs l)
+   ;; call with an unwinding label 
+   (call lv g rvs l l)
    ;; go to bb l 
    (goto l)
    ;; drop the lv
-   (drop lv l))
+   (drop lv l)
+   ;; drop with an unwinding label 
+   (drop lv l l))
   
   ;; lvalues
   (lvs (lv ...))
@@ -171,7 +175,7 @@
 
 (define reduce
   (reduction-relation
-   mir-e
+   mir-e #:domain C 
    (--> (in-hole C (+ const_1 const_2))
         (in-hole C ,(+ (term const_1) (term const_2)))
         "+")
