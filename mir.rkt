@@ -12,10 +12,10 @@
   ;; function
   ;;    g: function name
   ;;    vdecls: parameters
-  ;;    type: return type
+  ;;    ty: return type
   ;;    decl ...: list of variable declarations and local scopes 
   ;;    blk ...: list of basic blocks
-  (fn (-> g vdecls type decl ... blk ...))
+  (fn (-> g vdecls ty decl ... blk ...))
   
   ;; declaration
   ;;    vdecl: single variable declaration
@@ -25,8 +25,8 @@
   
   ;; variable declarations 
   (vdecls (vdecl ...))
-  (vdecl (x : type)                     ;; immutable (by default)
-         (mq x : type))                 ;; decl with mutability qualifier 
+  (vdecl (x : ty)                     ;; immutable (by default)
+         (mq x : ty))                 ;; decl with mutability qualifier 
   
   ;; mutability qualifiers
   (mq mut imm)
@@ -79,8 +79,8 @@
       const                             ;; constants
       (binop rv rv)                     ;; binary operations 
       (unop rv)                         ;; unary operations
-      (cast castkind lv as type)        ;; typecasts
-      (vec type len)                    ;; vectors 
+      (cast castkind lv as ty)          ;; typecasts
+      (vec ty len)                      ;; vectors 
       (rv ...)                          ;; aggregate values (i.e. tuples)
       (struct s sts))                   ;; structs, with name and body 
   
@@ -105,15 +105,15 @@
   ;; borrow kinds
   (borrowkind shared unique mut)
   
-  ;; type
-  (type unit-type                       ;; i.e. ()
-        int uint float                  ;; numbers 
-        bool                            ;; booleans 
-        (struct s)                      ;; structs 
-        (type ...)                      ;; aggregate types (i.e. tuples) 
-        (vec type len)                  ;; vectors 
-        (& mq type)                     ;; types with qualifiers 
-        (box type))                     ;; boxes 
+  ;; types
+  (ty unit-ty                           ;; i.e. ()
+      int uint float                    ;; numbers 
+      bool                              ;; booleans 
+      (struct s)                        ;; structs 
+      (ty ...)                          ;; aggregate types (i.e. tuples) 
+      (vec ty len)                      ;; vectors 
+      (& mq ty)                         ;; types with qualifiers 
+      (box ty))                         ;; boxes 
   
   ;; error messages
   (msg string)
@@ -191,38 +191,38 @@
 
 (define-extended-language mir-ops mir
   ;; Evaluation contexts for operations
-  (C hole 
-     (+ const C) (+ C rv)
-     (- const C) (- C rv)
-     (* const C) (* C rv)
-     (/ const C) (/ C rv)
-     (< const C) (< C rv)
-     (> const C) (> C rv)
-     (% const C) (% C rv)))
+  (Cx hole 
+     (+ const Cx) (+ Cx rv)
+     (- const Cx) (- Cx rv)
+     (* const Cx) (* Cx rv)
+     (/ const Cx) (/ Cx rv)
+     (< const Cx) (< Cx rv)
+     (> const Cx) (> Cx rv)
+     (% const Cx) (% Cx rv)))
 
 (define reduce
   (reduction-relation
    mir-ops
    ;; BinOp evaluation rules 
    ;; FIXME: how does Rust deal with NaNs? 
-   (--> (in-hole C (+ const_1 const_2))
-        (in-hole C ,(+ (term const_1) (term const_2)))
+   (--> (in-hole Cx (+ const_1 const_2))
+        (in-hole Cx ,(+ (term const_1) (term const_2)))
         "+")
-   (--> (in-hole C (- const_1 const_2))
-        (in-hole C ,(- (term const_1) (term const_2)))
+   (--> (in-hole Cx (- const_1 const_2))
+        (in-hole Cx ,(- (term const_1) (term const_2)))
         "-")
-   (--> (in-hole C (* const_1 const_2))
-        (in-hole C ,(* (term const_1) (term const_2)))
+   (--> (in-hole Cx (* const_1 const_2))
+        (in-hole Cx ,(* (term const_1) (term const_2)))
         "*")
-   (--> (in-hole C (/ const_1 const_2))
-        (in-hole C ,(/ (term const_1) (term const_2)))
+   (--> (in-hole Cx (/ const_1 const_2))
+        (in-hole Cx ,(/ (term const_1) (term const_2)))
         "/")
-   (--> (in-hole C (< const_1 const_2))
-        (in-hole C ,(< (term const_1) (term const_2)))
+   (--> (in-hole Cx (< const_1 const_2))
+        (in-hole Cx ,(< (term const_1) (term const_2)))
         "<")
-   (--> (in-hole C (> const_1 const_2))
-        (in-hole C ,(> (term const_1) (term const_2)))
+   (--> (in-hole Cx (> const_1 const_2))
+        (in-hole Cx ,(> (term const_1) (term const_2)))
         ">")
-   (--> (in-hole C (% const_1 const_2))
-        (in-hole C ,(remainder (term const_1) (term const_2)))
+   (--> (in-hole Cx (% const_1 const_2))
+        (in-hole Cx ,(remainder (term const_1) (term const_2)))
         "remainder")))
