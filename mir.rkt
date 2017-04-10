@@ -54,9 +54,9 @@
                          (const l) ...
                          (otherwise l))
               (assert rv l msg)         ;; checked branch
-                                        ;;    rv: condition
-                                        ;;    l: block to branch to, if rv evals to true
-                                        ;;    msg: error message, if rv evals to false
+              ;;    rv: condition
+              ;;    l: block to branch to, if rv evals to true
+              ;;    msg: error message, if rv evals to false
               (assert rv l l msg)       ;; as above, with extra unwinding label 
               (call lv g rvs l)         ;; lv gets the result of calling g(rvs), branch to l on return  
               (call lv g rvs l l)       ;; as above, with extra unwinding label  
@@ -87,8 +87,7 @@
   ;; constants (can be evaluated at compile time)
   (const boolean
          number
-         ;; unit values 
-         unit)
+         unit)                          ;; unit values
   
   ;; binary operation kinds
   (binop + - * / % ^ & \| << >> == < <= != >= >)
@@ -131,31 +130,99 @@
 ;; =========================================================
 ;; Evaluation
 ;; =========================================================
+(define-extended-language mir-machine mir
+  ;; a state of the machine
+  ;;    prog: the program
+  ;;    H: the heap
+  ;;    V: the global variable table 
+  (M (prog H V))
+  ;; Heap, addresses mapped to their heap value
+  (H ((α hv) ...))
+  (hv (ptr α)                           ;; pointer
+      number                            ;; numerical value
+      void)                             ;; void (uninitialized)
+  ;; Variable symbol table, vars mapped to their addresses in the heap 
+  (V ((x α) ...))
+  ;; Address (index of a value into the heap-list?)
+  (α number))
 
-(define-extended-language mir-e mir
-  ;; Evaluation contexts 
+;; FIXME error handling? 
+;; Returns the address mapped to this variable in the variable symbol table
+(define-metafunction mir-machine
+  get-address : V x -> α
+  [(get-address V x) (get V x)])
+
+;; FIXME error handling?
+;; Returns the value mapped to this variable in the heap 
+(define-metafunction mir-machine
+  deref : H V x -> hv
+  [(deref H V x) (get H α)
+                 (where α (get-address V x))])
+
+;; Allocates 1 block of memory on the heap, returns the new address
+(define-metafunction mir-machine
+  malloc : H -> (H α)
+  [(malloc H_old) (H_new α_new)
+                  (where ((α_old hv) ...) H_old)
+                  (where α_new ,(add1 (apply max (term (-1 α_old ...)))))
+                  (where H_new (extend H_old α_new))])
+
+;; Extends the heap with the new address 
+(define-metafunction mir-machine
+  extend : H α -> H
+  [(extend ((α_old hv) ...) α_new) ((α_new void) (α_old hv) ...)])
+
+;; Returns the value to which the key is mapped in the list
+;; #f if there is no mapping 
+(define-metafunction mir-machine
+  ;; Assumes key is unique in the list 
+  get : ((any any) ...) any -> any or #f
+  [(get ((any_1 any_v1) ... (any_0 any_v0) (any_2 any_v2) ...) any_0)
+   any_v0]
+  [(get ((any_1 any_v1) ...) any_0) #f])
+
+;; Updates the value mapped to this variable in the heap
+(define-metafunction mir-machine
+  ;; Assumes this variable has already been initialized in V and H
+  put : H V x hv -> H
+  [(put ((α_1 hv_1) ... (α_0 hv_old) (α_2 hv_2) ...) V x_0 hv_new)
+   ((α_1 hv_1) ... (α_0 hv_new) (α_2 hv_2) ...)
+   (where α_0 (get-address V x_0))])
+
+(define-extended-language mir-ops mir
+  ;; Evaluation contexts for operations
   (C hole 
-     ;; BinOps
      (+ const C) (+ C rv)
      (- const C) (- C rv)
      (* const C) (* C rv)
-     (/ const C) (/ C rv)))
+     (/ const C) (/ C rv)
+     (< const C) (< C rv)
+     (> const C) (> C rv)
+     (% const C) (% C rv)))
 
 (define reduce
   (reduction-relation
-   mir-e  
+   mir-ops
+   ;; BinOp evaluation rules 
+   ;; FIXME: how does Rust deal with NaNs? 
    (--> (in-hole C (+ const_1 const_2))
         (in-hole C ,(+ (term const_1) (term const_2)))
         "+")
-   
    (--> (in-hole C (- const_1 const_2))
         (in-hole C ,(- (term const_1) (term const_2)))
         "-")
-   
    (--> (in-hole C (* const_1 const_2))
         (in-hole C ,(* (term const_1) (term const_2)))
         "*")
-   
    (--> (in-hole C (/ const_1 const_2))
         (in-hole C ,(/ (term const_1) (term const_2)))
-        "/")))
+        "/")
+   (--> (in-hole C (< const_1 const_2))
+        (in-hole C ,(< (term const_1) (term const_2)))
+        "<")
+   (--> (in-hole C (> const_1 const_2))
+        (in-hole C ,(> (term const_1) (term const_2)))
+        ">")
+   (--> (in-hole C (% const_1 const_2))
+        (in-hole C ,(remainder (term const_1) (term const_2)))
+        "remainder")))
