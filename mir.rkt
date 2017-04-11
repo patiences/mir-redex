@@ -159,16 +159,46 @@
       (cast castkind Cx as ty)          
       (const ... Cx rv ...)))
 
+;; FIXME: Avoid keeping H and V everywhere
 (define run
   (reduction-relation
    mir-machine
-
    (--> (in-hole Cx ((use x_0) H V))
         (in-hole Cx (deref H V x_0))
         "use")
    (--> (in-hole Cx ((& borrowkind x_0) H V))
         (in-hole Cx (get-address V x_0))
-        "ref")))
+        "ref")
+   (--> (in-hole Cx ((binop const_1 const_2) H V))
+        (in-hole Cx (eval-binop binop const_1 const_2))
+        "binop")
+   (--> (in-hole Cx ((unop const) H V))
+        (in-hole Cx (eval-unop unop const))
+        "unop")))
+
+(define-metafunction mir-machine
+  eval-binop : binop const const -> const  
+  [(eval-binop + const_1 const_2) ,(+ (term const_1) (term const_2))]
+  [(eval-binop - const_1 const_2) ,(- (term const_1) (term const_2))]
+  [(eval-binop * const_1 const_2) ,(* (term const_1) (term const_2))]
+  [(eval-binop / const_1 const_2) ,(/ (term const_1) (term const_2))]
+  [(eval-binop ^ const_1 const_2) ,(bitwise-xor (term const_1) (term const_2))]
+  [(eval-binop & const_1 const_2) ,(bitwise-and (term const_1) (term const_2))]
+  [(eval-binop \| const_1 const_2) ,(bitwise-ior (term const_1) (term const_2))]
+  [(eval-binop << const_1 const_2) ,(arithmetic-shift (term const_1) (term const_2))]
+  [(eval-binop >> const_1 const_2) ,(arithmetic-shift (term const_1) (term (eval-unop - const_2)))]
+  [(eval-binop < const_1 const_2) ,(< (term const_1) (term const_2))]
+  [(eval-binop <= const_1 const_2) ,(<= (term const_1) (term const_2))]
+  [(eval-binop != const_1 const_2) ,(not (term (eval-binop == const_1 const_2)))]
+  [(eval-binop == const_1 const_2) ,(= (term const_1) (term const_2))]
+  [(eval-binop > const_1 const_2) ,(> (term const_1) (term const_2))]
+  [(eval-binop >= const_1 const_2) ,(>= (term const_1) (term const_2))]
+  [(eval-binop % const_1 const_2) ,(remainder (term const_1) (term const_2))])
+
+(define-metafunction mir-machine
+  eval-unop : unop const -> const
+  [(eval-unop ! const) ,(not (term const))]
+  [(eval-unop - const) ,(- (term const))])
 
 ;; FIXME error handling? 
 ;; Returns the address mapped to this variable in the variable symbol table
@@ -212,41 +242,3 @@
   [(put ((α_1 hv_1) ... (α_0 hv_old) (α_2 hv_2) ...) V x_0 hv_new)
    ((α_1 hv_1) ... (α_0 hv_new) (α_2 hv_2) ...)
    (where α_0 (get-address V x_0))])
-
-(define-extended-language mir-ops mir
-  ;; Evaluation contexts for operations
-  (Cx hole 
-     (+ const Cx) (+ Cx rv)
-     (- const Cx) (- Cx rv)
-     (* const Cx) (* Cx rv)
-     (/ const Cx) (/ Cx rv)
-     (< const Cx) (< Cx rv)
-     (> const Cx) (> Cx rv)
-     (% const Cx) (% Cx rv)))
-
-(define reduce
-  (reduction-relation
-   mir-ops
-   ;; BinOp evaluation rules 
-   ;; FIXME: how does Rust deal with NaNs? 
-   (--> (in-hole Cx (+ const_1 const_2))
-        (in-hole Cx ,(+ (term const_1) (term const_2)))
-        "+")
-   (--> (in-hole Cx (- const_1 const_2))
-        (in-hole Cx ,(- (term const_1) (term const_2)))
-        "-")
-   (--> (in-hole Cx (* const_1 const_2))
-        (in-hole Cx ,(* (term const_1) (term const_2)))
-        "*")
-   (--> (in-hole Cx (/ const_1 const_2))
-        (in-hole Cx ,(/ (term const_1) (term const_2)))
-        "/")
-   (--> (in-hole Cx (< const_1 const_2))
-        (in-hole Cx ,(< (term const_1) (term const_2)))
-        "<")
-   (--> (in-hole Cx (> const_1 const_2))
-        (in-hole Cx ,(> (term const_1) (term const_2)))
-        ">")
-   (--> (in-hole Cx (% const_1 const_2))
-        (in-hole Cx ,(remainder (term const_1) (term const_2)))
-        "remainder")))

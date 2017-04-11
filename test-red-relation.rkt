@@ -3,20 +3,9 @@
          rackunit)
 (require "mir.rkt")
 
-(check-not-false (redex-match mir-ops const (term 2)))
-(check-not-false (redex-match mir-ops rv (term (+ 1 2))))
-
-;; BinOps 
-(test-->> reduce (term (+ 1 2)) (term 3))
-(test-->> reduce (term (- 4 -20)) (term 24))
-(test-->> reduce (term (* 5 6)) (term 30))
-(test-->> reduce (term (/ 6 3)) (term 2))
-(test-->> reduce (term (< 1 2)) #t)
-(test-->> reduce (term (% -10 3)) (term -1))
-
 ;; Tests for metafunctions
 
-;; For testing
+;; Constants for testing
 (define V0 (term [(x 15)
                   (y 16)
                   (z 17)]))
@@ -38,6 +27,26 @@
             (term (ptr 13)))
   (test-->> run (term ((& mut x) ,H0 ,V0))
             (term 15))
+  (test-->> run (term ((+ 1 2) ,H0 ,V0)) (term 3))
+  (test-->> run (term ((- 4 -20) ,H0 ,V0)) (term 24))
+  (test-->> run (term ((* 5 6) ,H0 ,V0)) (term 30))
+  (test-->> run (term ((/ 6 3) ,H0 ,V0)) (term 2))
+  (test-->> run (term ((< 1 2) ,H0 ,V0)) #t)
+  (test-->> run (term ((% -10 3) ,H0 ,V0)) (term -1))
+  (test-->> run (term ((+ ((& mut x) ,H0 ,V0) 1) ,H0 ,V0)) (term 16)) ; x + 1
+  (test-->> run (term ((+ 1 ((& mut x) ,H0 ,V0)) ,H0 ,V0)) (term 16)) ; 1 + x
+  #; ;; FIXME: This fails because the matching eval context is (binop Cx rv).
+  ;;        Should be able to fix if we don't lug around H and V
+  (test-->> run (term ((+ ((& mut x) ,H0 ,V0)         ; x + x 
+                          ((& mut x) ,H0 ,V0))
+                       ,H0 ,V0))
+            (term 30))
+  (test-->> run (term ((<< 8 2) ,H0 ,V0)) (term 32))
+  (test-->> run (term ((>> 8 2) ,H0 ,V0)) (term 2))
+  (test-->> run (term ((== 1 2) ,H0 ,V0)) (term #f))
+  (test-->> run (term ((!= 1 2) ,H0 ,V0)) (term #t))
+  (test-->> run (term ((- 15) ,H0 ,V0)) (term -15))
+  (test-->> run (term ((! #t) ,H0 ,V0)) (term #f))
   (test-results))
 
 (rv-eval-tests)
