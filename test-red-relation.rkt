@@ -29,6 +29,18 @@
                   (17 (ptr 13))
                   (18 15)]))
 (check-not-false (redex-match mir-machine H H0))
+
+;; =========================================================
+(define (rv-eval-tests)  
+  (test-->> run (term ((use y),H0 ,V0))
+            (term void))
+  (test-->> run (term ((use z) ,H0 ,V0))
+            (term (ptr 13)))
+  (test-->> run (term ((& mut x) ,H0 ,V0))
+            (term 15))
+  (test-results))
+
+(rv-eval-tests)
 ;; =========================================================
 ;; get : ((any any) ...) any -> any or #f
 (test-equal (term (get () x)) #f)

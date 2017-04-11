@@ -132,10 +132,10 @@
 ;; =========================================================
 (define-extended-language mir-machine mir
   ;; a state of the machine
-  ;;    prog: the program
+  ;;    rv: a single rvalue ;;TODO: eventually work up to prog... 
   ;;    H: the heap
   ;;    V: the global variable table 
-  (M (prog H V))
+  (P (rv H V))
   ;; Heap, addresses mapped to their heap value
   (H ((α hv) ...))
   (hv (ptr α)                           ;; pointer
@@ -144,7 +144,31 @@
   ;; Variable symbol table, vars mapped to their addresses in the heap 
   (V ((x α) ...))
   ;; Address (index of a value into the heap-list?)
-  (α number))
+  (α number)
+  ;; Evaluation contexts
+  (Cx hole
+      ;; P
+      (Cx H V)
+      ;; rvalues 
+      (use Cx)
+      (& borrowkind Cx)
+      (binop Cx rv)
+      (binop const Cx)
+      (unop Cx)
+      (box Cx)
+      (cast castkind Cx as ty)          
+      (const ... Cx rv ...)))
+
+(define run
+  (reduction-relation
+   mir-machine
+
+   (--> (in-hole Cx ((use x_0) H V))
+        (in-hole Cx (deref H V x_0))
+        "use")
+   (--> (in-hole Cx ((& borrowkind x_0) H V))
+        (in-hole Cx (get-address V x_0))
+        "ref")))
 
 ;; FIXME error handling? 
 ;; Returns the address mapped to this variable in the variable symbol table
