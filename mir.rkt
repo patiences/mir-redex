@@ -67,7 +67,8 @@
   ;; lvalues
   (lvs (lv ...))
   (lv x
-      (· lv f))                         ;; projection (e.g. tuple access)
+      (· lv f)                         ;; projection (e.g. tuple access)
+      (* lv))                          ;; pointer deref
   
   ;; TODO: Consider combining tuples & structs & vectors into single "aggregate" value? 
   ;;        See http://manishearth.github.io/rust-internals-docs///rustc/mir/enum.Rvalue.html
@@ -159,22 +160,24 @@
       (cast castkind Cx as ty)          
       (const ... Cx rv ...)))
 
-;; FIXME: Avoid keeping H and V everywhere
+;; It seems we need to pass H and V around so that we can make updates.
+;; But this makes reducing composite expressions difficult... 
 (define run
   (reduction-relation
    mir-machine
    (--> (in-hole Cx ((use x_0) H V))
-        (in-hole Cx (deref H V x_0))
+        ((in-hole Cx (deref H V x_0)) H V)
         "use")
    (--> (in-hole Cx ((& borrowkind x_0) H V))
-        (in-hole Cx (get-address V x_0))
+        ((in-hole Cx (get-address V x_0)) H V)
         "ref")
    (--> (in-hole Cx ((binop const_1 const_2) H V))
-        (in-hole Cx (eval-binop binop const_1 const_2))
+        ((in-hole Cx (eval-binop binop const_1 const_2)) H V)
         "binop")
    (--> (in-hole Cx ((unop const) H V))
-        (in-hole Cx (eval-unop unop const))
+        ((in-hole Cx (eval-unop unop const)) H V)
         "unop")))
+
 
 (define-metafunction mir-machine
   eval-binop : binop const const -> const  

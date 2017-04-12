@@ -21,32 +21,45 @@
 
 ;; =========================================================
 (define (rv-eval-tests)  
-  (test-->> run (term ((use y),H0 ,V0))
-            (term void))
+  (test-->> run (term ((use y) ,H0 ,V0))
+            (term (void ,H0 ,V0)))
   (test-->> run (term ((use z) ,H0 ,V0))
-            (term (ptr 13)))
+            (term ((ptr 13) ,H0 ,V0)))
   (test-->> run (term ((& mut x) ,H0 ,V0))
-            (term 15))
-  (test-->> run (term ((+ 1 2) ,H0 ,V0)) (term 3))
-  (test-->> run (term ((- 4 -20) ,H0 ,V0)) (term 24))
-  (test-->> run (term ((* 5 6) ,H0 ,V0)) (term 30))
-  (test-->> run (term ((/ 6 3) ,H0 ,V0)) (term 2))
-  (test-->> run (term ((< 1 2) ,H0 ,V0)) #t)
-  (test-->> run (term ((% -10 3) ,H0 ,V0)) (term -1))
-  (test-->> run (term ((+ ((& mut x) ,H0 ,V0) 1) ,H0 ,V0)) (term 16)) ; x + 1
-  (test-->> run (term ((+ 1 ((& mut x) ,H0 ,V0)) ,H0 ,V0)) (term 16)) ; 1 + x
-  #; ;; FIXME: This fails because the matching eval context is (binop Cx rv).
-  ;;        Should be able to fix if we don't lug around H and V
-  (test-->> run (term ((+ ((& mut x) ,H0 ,V0)         ; x + x 
-                          ((& mut x) ,H0 ,V0))
-                       ,H0 ,V0))
-            (term 30))
-  (test-->> run (term ((<< 8 2) ,H0 ,V0)) (term 32))
-  (test-->> run (term ((>> 8 2) ,H0 ,V0)) (term 2))
-  (test-->> run (term ((== 1 2) ,H0 ,V0)) (term #f))
-  (test-->> run (term ((!= 1 2) ,H0 ,V0)) (term #t))
-  (test-->> run (term ((- 15) ,H0 ,V0)) (term -15))
-  (test-->> run (term ((! #t) ,H0 ,V0)) (term #f))
+            (term (15 ,H0 ,V0)))
+  (test-->> run (term ((+ 1 2) ,H0 ,V0)) (term (3 ,H0 ,V0)))
+  (test-->> run (term ((- 4 -20) ,H0 ,V0)) (term (24 ,H0 ,V0)))
+  (test-->> run (term ((* 5 6) ,H0 ,V0)) (term (30 ,H0 ,V0)))
+  (test-->> run (term ((/ 6 3) ,H0 ,V0)) (term (2 ,H0 ,V0)))
+  (test-->> run (term ((< 1 2) ,H0 ,V0)) (term (#t ,H0 ,V0)))
+  (test-->> run (term ((% -10 3) ,H0 ,V0)) (term (-1 ,H0 ,V0)))
+  (test-->> run
+            (term ((+ ((& mut x) ,H0 ,V0) 1) ,H0 ,V0)) ; x + 1
+            (term ((16 ,H0 ,V0) ,H0 ,V0)))
+  (test-->> run
+            (term ((+ 1 ((& mut x) ,H0 ,V0)) ,H0 ,V0)) ; 1 + x
+            (term ((16 ,H0 ,V0) ,H0 ,V0)))
+  #; ;;FIXME why doesn't this match 
+  (test-->> run
+            (term ((+ ((& mut x) ,H0 ,V0)        ; x + x 
+                      ((& mut x) ,H0 ,V0)
+                      ,H0 ,V0)))
+            (term ((30 ,H0 ,V0) ,H0 ,V0)))
+  (test-->> run (term ((<< 8 2) ,H0 ,V0)) (term (32 ,H0 ,V0)))
+  (test-->> run (term ((>> 8 2) ,H0 ,V0)) (term (2 ,H0 ,V0)))
+  (test-->> run (term ((== 1 2) ,H0 ,V0)) (term (#f ,H0 ,V0)))
+  (test-->> run (term ((!= 1 2) ,H0 ,V0)) (term (#t ,H0 ,V0)))
+  (test-->> run (term ((- 15) ,H0 ,V0)) (term (-15 ,H0 ,V0)))
+  (test-->> run (term ((! #t) ,H0 ,V0)) (term (#f ,H0 ,V0)))
+  (test-->> run (term ((< 1 2) ,H0 ,V0)) (term (#t ,H0 ,V0)))
+  #; ;; FIXME
+  (test-->> run (term ((! (< 1 2)) ,H0 ,V0)) (term (#f ,H0 ,V0)))
+  #; ;; FIXME 
+  (test-->> run
+            (term ((((+ 1 2) ,H0 ,V0)
+                    ((+ 4 5) ,H0 ,V0))
+                   ,H0 ,V0))
+            (term ((3 9) ,H0 ,V0)))
   (test-results))
 
 (rv-eval-tests)
