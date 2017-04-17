@@ -70,9 +70,6 @@
       (· lv f)                         ;; projection (e.g. tuple access)
       (* lv))                          ;; pointer deref
   
-  ;; TODO: Consider combining tuples & structs & vectors into single "aggregate" value? 
-  ;;        See http://manishearth.github.io/rust-internals-docs///rustc/mir/enum.Rvalue.html
-  
   ;; rvalues
   (rvs (rv ...))
   (rv (use lv)                          ;; use lv  
@@ -81,8 +78,12 @@
       (binop rv rv)                     ;; binary operations 
       (unop rv)                         ;; unary operations
       (cast castkind lv as ty)          ;; typecasts
+      ;; FIXME: capacity? http://manishearth.github.io/rust-internals-docs///src/collections/vec.rs.html#296-299
       (vec ty len)                      ;; vectors 
       (rv ...)                          ;; aggregate values (i.e. tuples)
+      ;; FIXME: is this the right information to keep in the box? 
+      ;;        https://doc.rust-lang.org/src/alloc/boxed.rs.html#108
+      (box rv)                          ;; pointer to heap-allocated val
       (struct s sts))                   ;; structs, with name and body 
   
   ;; constants (can be evaluated at compile time)
@@ -113,13 +114,16 @@
       (struct s)                        ;; structs 
       (ty ...)                          ;; aggregate types (i.e. tuples) 
       (vec ty len)                      ;; vectors 
-      (& mq ty)                         ;; types with qualifiers 
-      (box ty))                         ;; boxes 
+      (& mq ty)                         ;; reference types with qualifiers
+      (* mq ty)                         ;; raw pointer types with qualifiers
+      (box ty)                          ;; box 
+      ;; FIXME: multiple generic types https://doc.rust-lang.org/book/generics.html
+      T)                                ;; generic            
   
   ;; error messages
   (msg string)
   
-  ;; vector length ;; FIXME: is this capacity or length? 
+  ;; vector length 
   (len integer)
   
   (x variable-not-otherwise-mentioned)  ;; variables 
@@ -178,7 +182,7 @@
         ((in-hole Cx (eval-unop unop const)) H V)
         "unop")))
 
-
+;; Perform the binary operation
 (define-metafunction mir-machine
   eval-binop : binop const const -> const  
   [(eval-binop + const_1 const_2) ,(+ (term const_1) (term const_2))]
@@ -198,6 +202,7 @@
   [(eval-binop >= const_1 const_2) ,(>= (term const_1) (term const_2))]
   [(eval-binop % const_1 const_2) ,(remainder (term const_1) (term const_2))])
 
+;; Perform the unary operation 
 (define-metafunction mir-machine
   eval-unop : unop const -> const
   [(eval-unop ! const) ,(not (term const))]
