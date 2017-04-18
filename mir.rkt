@@ -127,7 +127,7 @@
   (len integer)
   
   (x variable-not-otherwise-mentioned)  ;; variables 
-  (f number)                            ;; field names
+  (f integer)                           ;; field names
   (g variable-not-otherwise-mentioned)  ;; function names
   (l variable-not-otherwise-mentioned)  ;; labels (i.e. block names)
   (s variable-not-otherwise-mentioned)) ;; struct names
@@ -221,18 +221,23 @@
   [(deref H V x) (get H α)
                  (where α (get-address V x))])
 
-;; Allocates 1 block of memory on the heap, returns the new address
+;; Allocates len blocks of memory on the heap, returns the new base address
 (define-metafunction mir-machine
-  malloc : H -> (H α)
-  [(malloc H_old) (H_new α_new)
+  ;; If len == 0, will not allocate memory but returns next available address 
+  malloc : H len -> (H α)
+  [(malloc H_old len) (H_new α_new)
                   (where ((α_old hv) ...) H_old)
                   (where α_new ,(add1 (apply max (term (-1 α_old ...)))))
-                  (where H_new (extend H_old α_new))])
+                  (where H_new (extend H_old α_new len))])
 
-;; Extends the heap with the new address 
+;; Extends the heap with len blocks, starting at the given address 
 (define-metafunction mir-machine
-  extend : H α -> H
-  [(extend ((α_old hv) ...) α_new) ((α_new void) (α_old hv) ...)])
+  extend : H α len -> H
+  [(extend H α_new 0) H]
+  [(extend ((α_old hv) ...) α_new len)
+   (extend ((α_new void) (α_old hv) ...)
+           ,(add1 (term α_new))
+           ,(sub1 (term len)))])
 
 ;; Returns the value to which the key is mapped in the list
 ;; #f if there is no mapping 
