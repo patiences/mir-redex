@@ -256,14 +256,14 @@
   ;; Returns the address mapped to the variable x in the env 
   env-lookup : ρ x -> α
   [(env-lookup (env (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...) x_0) α_0]
-  [(env-lookup (env (x_1 α_1) ...) x) ,(error "not found in environment: " (term x))])
+  [(env-lookup (env (x_1 α_1) ...) x) ,(error "not found in environment:" (term x))])
 
 ;; store-lookup : σ α -> v
 (define-metafunction mir-machine
   ;; Returns the value mapped to the address α in the store 
   store-lookup : σ α -> v
   [(store-lookup (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0) v_0]
-  [(store-lookup (store (α_1 v_1) ...) α) ,(error "not found in store: " (term α))])
+  [(store-lookup (store (α_1 v_1) ...) α) ,(error "not found in store:" (term α))])
 
 ;; put : σ ρ x v -> σ
 (define-metafunction mir-machine
