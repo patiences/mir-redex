@@ -94,7 +94,7 @@
   (operand (use lv)
            const)
   
-  ;; constants (can be evaluated at compile time)
+  ;; A subset of rvalues that can be evaluated at compile time 
   (const boolean
          number
          unit)                          ;; unit values
@@ -189,7 +189,9 @@
    (--> ((in-hole E (unop const)) σ ρ)
         ((in-hole E (eval-unop unop const)) σ ρ)
         "unop")
-   ;; (--> (in-hole E ((cast castkind lv as ty) σ ρ)) What to do here? Treat as regular "use" and throw cast info away? 
+   (--> ((in-hole E (cast castkind lv as ty)) σ ρ)
+        ((in-hole E (eval-cast lv ty)) σ ρ)
+        "typecast")
    ;; (--> (in-hole E ((vec ty len) σ ρ)) Vector creation -- call a vec new fn?
    ;; boxes, structs, tuples
    ))
@@ -223,6 +225,13 @@
   eval-unop : unop const -> const
   [(eval-unop ! const) ,(not (term const))]
   [(eval-unop - const) ,(- (term const))])
+
+;; A dummy method, reminder we need to deal with typecasts
+;; FIXME:: is this the right signature? 
+;; eval-cast : lv ty -> rv 
+(define-metafunction mir-machine
+  eval-cast : lv ty -> rv
+  [(eval-cast lv ty) (use lv)])
 
 ;; deref : σ ρ x -> v 
 (define-metafunction mir-machine
@@ -268,8 +277,8 @@
 ;; put : σ ρ x v -> σ
 (define-metafunction mir-machine
   ;; Updates the value mapped to this variable in the heap
-  ;; Assumes this variable has already been initialized in ρ and H
   put : σ ρ x v -> σ
   [(put (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
-   (where α_0 (env-lookup ρ x_0))])
+   (where α_0 (env-lookup ρ x_0))]
+  [(put (store (α_1 v_1) ...) ρ x v) ,(error "not found in store:" (term x))])
