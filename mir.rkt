@@ -75,6 +75,7 @@
   (rv (use lv)                          ;; use lv  
       (& borrowkind lv)                 ;; references (borrows)
       const                             ;; constants
+      ;; FIXME these are not nested rvs
       (binop rv rv)                     ;; binary operations 
       (unop rv)                         ;; unary operations
       (cast castkind lv as ty)          ;; typecasts
@@ -138,49 +139,52 @@
 (define-extended-language mir-machine mir
   ;; a state of the machine
   ;;    rv: a single rvalue ;;TODO: eventually work up to prog... 
-  ;;    H: the heap
-  ;;    V: the global variable table 
-  (P (rv H V))
-  ;; Heap, addresses mapped to their heap value
-  (H ((α hv) ...))
-  (hv (ptr α)                           ;; pointer
-      number                            ;; numerical value
-      void)                             ;; void (uninitialized)
-  ;; Variable symbol table, vars mapped to their addresses in the heap 
-  (V ((x α) ...))
-  ;; Address (index of a value into the heap-list?)
+  ;;    σ: the store (heap)
+  ;;    ρ: the global variable table 
+  (P (rv σ ρ))
+  ;; the heap, addresses mapped to their heap value
+  (σ ((α v) ...))
+  (v (ptr α)                           ;; pointer
+     number                            ;; numerical value
+     void)                             ;; void (uninitialized)
+  ;; Variable environment, vars mapped to their addresses in the heap 
+  (ρ ((x α) ...))
+  ;; Address 
   (α number)
   ;; Evaluation contexts
-  (Cx hole
-      ;; P
-      (Cx H V)
-      ;; rvalues 
-      (use Cx)
-      (& borrowkind Cx)
-      (binop Cx rv)
-      (binop const Cx)
-      (unop Cx)
-      (box Cx)
-      (cast castkind Cx as ty)          
-      (const ... Cx rv ...)))
+  (E hole
+     ;; P
+     (E σ ρ)
+     ;; rvalues 
+     (use E)
+     (& borrowkind E)
+     (binop E rv)
+     (binop const E)
+     (unop E)
+     (box E)
+     (cast castkind E as ty)          
+     (const ... E rv ...)))
 
-;; It seems we need to pass H and V around so that we can make updates.
-;; But this makes reducing composite expressions difficult... 
 (define run
   (reduction-relation
    mir-machine
-   (--> (in-hole Cx ((use x_0) H V))
-        ((in-hole Cx (deref H V x_0)) H V)
+   ;; Rvalues 
+   (--> ((in-hole E (use x_0)) σ ρ) 
+        ((in-hole E (deref σ ρ x_0)) σ ρ)
         "use")
-   (--> (in-hole Cx ((& borrowkind x_0) H V))
-        ((in-hole Cx (get-address V x_0)) H V)
+   (--> ((in-hole E (& borrowkind x_0)) σ ρ) 
+        ((in-hole E (get-address ρ x_0)) σ ρ)
         "ref")
-   (--> (in-hole Cx ((binop const_1 const_2) H V))
-        ((in-hole Cx (eval-binop binop const_1 const_2)) H V)
+   (--> ((in-hole E (binop const_1 const_2)) σ ρ)
+        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ)
         "binop")
-   (--> (in-hole Cx ((unop const) H V))
-        ((in-hole Cx (eval-unop unop const)) H V)
-        "unop")))
+   (--> ((in-hole E (unop const)) σ ρ)
+        ((in-hole E (eval-unop unop const)) σ ρ)
+        "unop")
+   ;; (--> (in-hole E ((cast castkind lv as ty) σ ρ)) What to do here? Treat as regular "use" and throw cast info away? 
+   ;; (--> (in-hole E ((vec ty len) σ ρ)) Vector creation -- call a vec new fn?
+   ;; boxes, structs, tuples
+   ))
 
 ;; Perform the binary operation
 (define-metafunction mir-machine
@@ -211,31 +215,31 @@
 ;; FIXME error handling? 
 ;; Returns the address mapped to this variable in the variable symbol table
 (define-metafunction mir-machine
-  get-address : V x -> α
-  [(get-address V x) (get V x)])
+  get-address : ρ x -> α
+  [(get-address ρ x) (get ρ x)])
 
 ;; FIXME error handling?
 ;; Returns the value mapped to this variable in the heap 
 (define-metafunction mir-machine
-  deref : H V x -> hv
-  [(deref H V x) (get H α)
-                 (where α (get-address V x))])
+  deref : σ ρ x -> v
+  [(deref σ ρ x) (get σ α)
+                 (where α (get-address ρ x))])
 
 ;; Allocates len blocks of memory on the heap, returns the new base address
 (define-metafunction mir-machine
   ;; If len == 0, will not allocate memory but returns next available address 
-  malloc : H len -> (H α)
-  [(malloc H_old len) (H_new α_new)
-                  (where ((α_old hv) ...) H_old)
-                  (where α_new ,(add1 (apply max (term (-1 α_old ...)))))
-                  (where H_new (extend H_old α_new len))])
+  malloc : σ len -> (σ α)
+  [(malloc σ_old len) (σ_new α_new)
+                      (where ((α_old v) ...) σ_old)
+                      (where α_new ,(add1 (apply max (term (-1 α_old ...)))))
+                      (where σ_new (extend σ_old α_new len))])
 
 ;; Extends the heap with len blocks, starting at the given address 
 (define-metafunction mir-machine
-  extend : H α len -> H
-  [(extend H α_new 0) H]
-  [(extend ((α_old hv) ...) α_new len)
-   (extend ((α_new void) (α_old hv) ...)
+  extend : σ α len -> σ
+  [(extend σ α_new 0) σ]
+  [(extend ((α_old v) ...) α_new len)
+   (extend ((α_new void) (α_old v) ...)
            ,(add1 (term α_new))
            ,(sub1 (term len)))])
 
@@ -250,8 +254,8 @@
 
 ;; Updates the value mapped to this variable in the heap
 (define-metafunction mir-machine
-  ;; Assumes this variable has already been initialized in V and H
-  put : H V x hv -> H
-  [(put ((α_1 hv_1) ... (α_0 hv_old) (α_2 hv_2) ...) V x_0 hv_new)
-   ((α_1 hv_1) ... (α_0 hv_new) (α_2 hv_2) ...)
-   (where α_0 (get-address V x_0))])
+  ;; Assumes this variable has already been initialized in ρ and H
+  put : σ ρ x v -> σ
+  [(put ((α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
+   ((α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
+   (where α_0 (get-address ρ x_0))])
