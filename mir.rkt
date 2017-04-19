@@ -131,8 +131,8 @@
   ;; error messages
   (msg string)
   
-  ;; vector length 
-  (len integer)
+  (len integer)                         ;; vector length 
+  (cap integer)                         ;; vector capacity 
   
   (x variable-not-otherwise-mentioned)  ;; variables 
   (f integer)                           ;; field names
@@ -282,3 +282,47 @@
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
    (where α_0 (env-lookup ρ x_0))]
   [(put (store (α_1 v_1) ...) ρ x v) ,(error "not found in store:" (term x))])
+
+;; update : σ α v -> σ
+(define-metafunction mir-machine
+  ;; Updates the value at the address in the store
+  update : σ α v -> σ
+  [(update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
+   (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)]
+  [(update (store (α_1 v_1) ...) α v) ,(error "address not in store:" (term α))]) 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Standard functions
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; Create a new empty vec (no allocation) 
+(define-metafunction mir-machine
+  vec-new : σ -> (σ (vec α len cap))
+  [(vec-new σ) (σ
+                (vec ,(cadr (term (malloc σ 0))) 0 0))])
+
+;; Create a new empty vec with capacity
+(define-metafunction mir-machine
+  vec-with-capacity : σ cap -> (σ (vec α len cap))
+  [(vec-with-capacity σ cap) (,(car (term (malloc σ cap))) ;; updated store
+                              (vec ,(cadr (term (malloc σ cap))) 0 cap))])
+
+;; Pushes a value onto the back of the vec
+(define-metafunction mir-machine
+  ;; FIXME assume we only have vectors of "heap values" (size 1) i.e. ptrs or nums
+  ;; Defer to when we can look up the size of the type and calculate offset accordingly.
+  vec-push : σ (vec α len cap) v -> (σ (vec α len cap))
+  ;; check if unallocated vector
+  [(vec-push σ (vec α_old 0 0) v) (vec-push ,(car (term (malloc σ 4)))
+                                            (vec ,(cadr (term (malloc σ 4))) 0 4)
+                                            v)]
+  ;; FIXME: deallocate old vector, and copy over contents.
+  [(vec-push σ (vec α_old len cap) v)
+   (vec-push ,(car (term (malloc σ ,(* (term cap) 2))))
+             (vec ,(cadr (term (malloc σ ,(* (term cap) 2)))) len ,(* (term cap) 2))
+             v)
+   (side-condition (equal? (term len) (term cap)))]
+  [(vec-push σ (vec α len cap) v) ((update σ ,(+ (term len) (term α)) v) 
+                                   (vec α ,(add1 (term len)) cap))])
+
+
