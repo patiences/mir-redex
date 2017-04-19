@@ -6,18 +6,20 @@
 ;; Tests for metafunctions
 
 ;; Constants for testing
-(define ENV0 (term [(a 14)
-                  (x 15)
-                  (y 16)
-                  (z 17)]))
+(define ENV0 (term [env 
+                    (a 14)
+                    (x 15)
+                    (y 16)
+                    (z 17)]))
 (check-not-false (redex-match mir-machine ρ ENV0))
 
-(define HEAP0 (term [(13 1)
-                  (14 2)
-                  (15 (ptr 14))
-                  (16 void)
-                  (17 (ptr 13))
-                  (18 15)]))
+(define HEAP0 (term [store
+                     (13 1)
+                     (14 2)
+                     (15 (ptr 14))
+                     (16 void)
+                     (17 (ptr 13))
+                     (18 15)]))
 (check-not-false (redex-match mir-machine σ HEAP0))
 
 ;; =========================================================
@@ -54,42 +56,50 @@
 
 (rv-eval-tests)
 ;; =========================================================
-;; get : ((any any) ...) any -> any or #f
-(test-equal (term (get () x)) #f)
-(test-equal (term (get ((a 1) (b 2) (c 3)) c)) 3)
-(test-equal (term (get ((1 111) (2 222) (3 333)) 3)) 333)
-(test-equal (term (get ((x 0) (y 0)) a)) #f)
+;; env-lookup : ρ x -> α
+(check-exn exn:fail? (term (env-lookup (env) x)))
+(check-exn exn:fail? (term (env-lookup (env (a 1)) c)))
+(test-equal (term (env-lookup (env (a 1) (b 2) (c 3)) c)) 3)
 
 ;; =========================================================
-;; extend : H α len -> H
-(test-equal (term (extend () 1 0)) (term ()))
-(test-equal (term (extend () 1 1)) (term [(1 void)]))
-(test-equal (term (extend ,HEAP0 19 1)) (term [(19 void)
-                                            (13 1)
-                                            (14 2)
-                                            (15 (ptr 14))
-                                            (16 void)
-                                            (17 (ptr 13))
-                                            (18 15)]))
-(test-equal (term (extend ,HEAP0 19 5)) (term [(23 void)
-                                            (22 void)
-                                            (21 void)
-                                            (20 void)
-                                            (19 void)
-                                            (13 1)
-                                            (14 2)
-                                            (15 (ptr 14))
-                                            (16 void)
-                                            (17 (ptr 13))
-                                            (18 15)]))
+;; store-lookup : σ α -> v
+(check-exn exn:fail? (term (store-lookup (store) 1)))
+(check-exn exn:fail? (term (store-lookup (store (1 1) 0))))
+(test-equal (term (store-lookup (store (1 111) (2 222) (3 333)) 3)) 333)
 
 ;; =========================================================
-;; malloc : H len -> (H α)
-(test-equal (term (malloc () 0)) (term (() 0)))
-(test-equal (term (malloc () 1)) (term ([(0 void)]
+;; extend : σ α len -> σ
+(test-equal (term (extend (store) 1 0)) (term (store)))
+(test-equal (term (extend (store) 1 1)) (term [store (1 void)]))
+(test-equal (term (extend ,HEAP0 19 1)) (term [store
+                                               (19 void)
+                                               (13 1)
+                                               (14 2)
+                                               (15 (ptr 14))
+                                               (16 void)
+                                               (17 (ptr 13))
+                                               (18 15)]))
+(test-equal (term (extend ,HEAP0 19 5)) (term [store
+                                               (23 void)
+                                               (22 void)
+                                               (21 void)
+                                               (20 void)
+                                               (19 void)
+                                               (13 1)
+                                               (14 2)
+                                               (15 (ptr 14))
+                                               (16 void)
+                                               (17 (ptr 13))
+                                               (18 15)]))
+
+;; =========================================================
+;; malloc : σ len -> (σ α)
+(test-equal (term (malloc (store) 0)) (term ((store) 0)))
+(test-equal (term (malloc (store) 1)) (term ([store (0 void)]
                                         0)))
 (test-equal (term (malloc ,HEAP0 1))
-            (term ([(19 void)
+            (term ([store
+                    (19 void)
                     (13 1)
                     (14 2)
                     (15 (ptr 14))
@@ -98,7 +108,8 @@
                     (18 15)]
                    19)))
 (test-equal (term (malloc ,HEAP0 2))
-            (term ([(20 void)
+            (term ([store
+                    (20 void)
                     (19 void)
                     (13 1)
                     (14 2)
@@ -109,14 +120,15 @@
                    19)))
 
 ;; =========================================================
-;; deref : H V x -> hv
+;; deref : σ ρ x -> v
 (test-equal (term (deref ,HEAP0 ,ENV0 x)) (term (ptr 14)))
 (test-equal (term (deref ,HEAP0 ,ENV0 y)) (term void))
 
 ;; =========================================================
-;; put : H V x hv -> H
+;; put : σ ρ x v -> σ
 (test-equal (term (put ,HEAP0 ,ENV0 x 1)) ; x is at address 15
-            (term [(13 1)
+            (term [store
+                   (13 1)
                    (14 2)
                    (15 1)
                    (16 void)

@@ -2,6 +2,10 @@
 (require redex)
 (provide (all-defined-out))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+;; Grammar
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
+
 (define-language mir
   ;; program
   ;;    fns: list of functions 
@@ -147,12 +151,12 @@
   ;;    ρ: the global variable table 
   (P (rv σ ρ))
   ;; the heap, addresses mapped to their heap value
-  (σ ((α v) ...))
+  (σ (store (α v) ...))
   (v (ptr α)                           ;; pointer
      number                            ;; numerical value
      void)                             ;; void (uninitialized)
   ;; Variable environment, vars mapped to their addresses in the heap 
-  (ρ ((x α) ...))
+  (ρ (env (x α) ...))
   ;; Address 
   (α number)
   ;; Evaluation contexts
@@ -177,7 +181,7 @@
         ((in-hole E (deref σ ρ x_0)) σ ρ)
         "use")
    (--> ((in-hole E (& borrowkind x_0)) σ ρ) 
-        ((in-hole E (get-address ρ x_0)) σ ρ)
+        ((in-hole E (env-lookup ρ x_0)) σ ρ)
         "ref")
    (--> ((in-hole E (binop const_1 const_2)) σ ρ)
         ((in-hole E (eval-binop binop const_1 const_2)) σ ρ)
@@ -220,50 +224,52 @@
   [(eval-unop ! const) ,(not (term const))]
   [(eval-unop - const) ,(- (term const))])
 
-;; FIXME error handling? 
-;; Returns the address mapped to this variable in the variable symbol table
+;; deref : σ ρ x -> v 
 (define-metafunction mir-machine
-  get-address : ρ x -> α
-  [(get-address ρ x) (get ρ x)])
-
-;; FIXME error handling?
-;; Returns the value mapped to this variable in the heap 
-(define-metafunction mir-machine
+  ;; Returns the value mapped to this variable in the heap 
   deref : σ ρ x -> v
-  [(deref σ ρ x) (get σ α)
-                 (where α (get-address ρ x))])
+  [(deref σ ρ x) (store-lookup σ α)
+                 (where α (env-lookup ρ x))])
 
-;; Allocates len blocks of memory on the heap, returns the new base address
+;; malloc : σ len -> (σ α)
 (define-metafunction mir-machine
+  ;; Allocates len blocks of memory on the heap, returns the new base address
   ;; If len == 0, will not allocate memory but returns next available address 
   malloc : σ len -> (σ α)
   [(malloc σ_old len) (σ_new α_new)
-                      (where ((α_old v) ...) σ_old)
+                      (where (store (α_old v) ...) σ_old)
                       (where α_new ,(add1 (apply max (term (-1 α_old ...)))))
                       (where σ_new (extend σ_old α_new len))])
 
-;; Extends the heap with len blocks, starting at the given address 
+;; extend : σ α len -> σ
 (define-metafunction mir-machine
+  ;; Extends the heap with len blocks, starting at the given address 
   extend : σ α len -> σ
   [(extend σ α_new 0) σ]
-  [(extend ((α_old v) ...) α_new len)
-   (extend ((α_new void) (α_old v) ...)
+  [(extend (store (α_old v) ...) α_new len)
+   (extend (store (α_new void) (α_old v) ...)
            ,(add1 (term α_new))
            ,(sub1 (term len)))])
 
-;; Returns the value to which the key is mapped in the list
-;; #f if there is no mapping 
+;; env-lookup : ρ x -> α
 (define-metafunction mir-machine
-  ;; Assumes key is unique in the list 
-  get : ((any any) ...) any -> any or #f
-  [(get ((any_1 any_v1) ... (any_0 any_v0) (any_2 any_v2) ...) any_0)
-   any_v0]
-  [(get ((any_1 any_v1) ...) any_0) #f])
+  ;; Returns the address mapped to the variable x in the env 
+  env-lookup : ρ x -> α
+  [(env-lookup (env (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...) x_0) α_0]
+  [(env-lookup (env (x_1 α_1) ...) x) ,(error "not found in environment: " (term x))])
 
-;; Updates the value mapped to this variable in the heap
+;; store-lookup : σ α -> v
 (define-metafunction mir-machine
+  ;; Returns the value mapped to the address α in the store 
+  store-lookup : σ α -> v
+  [(store-lookup (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0) v_0]
+  [(store-lookup (store (α_1 v_1) ...) α) ,(error "not found in store: " (term α))])
+
+;; put : σ ρ x v -> σ
+(define-metafunction mir-machine
+  ;; Updates the value mapped to this variable in the heap
   ;; Assumes this variable has already been initialized in ρ and H
   put : σ ρ x v -> σ
-  [(put ((α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
-   ((α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
-   (where α_0 (get-address ρ x_0))])
+  [(put (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
+   (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
+   (where α_0 (env-lookup ρ x_0))])
