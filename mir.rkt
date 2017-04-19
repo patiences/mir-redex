@@ -75,17 +75,20 @@
   (rv (use lv)                          ;; use lv  
       (& borrowkind lv)                 ;; references (borrows)
       const                             ;; constants
-      ;; FIXME these are not nested rvs
-      (binop rv rv)                     ;; binary operations 
-      (unop rv)                         ;; unary operations
+      (binop operand operand)           ;; binary operations 
+      (unop operand)                    ;; unary operations
       (cast castkind lv as ty)          ;; typecasts
       ;; FIXME: capacity? http://manishearth.github.io/rust-internals-docs///src/collections/vec.rs.html#296-299
       (vec ty len)                      ;; vectors 
-      (rv ...)                          ;; aggregate values (i.e. tuples)
+      (operand ...)                     ;; aggregate values (i.e. tuples)
       ;; FIXME: is this the right information to keep in the box? 
       ;;        https://doc.rust-lang.org/src/alloc/boxed.rs.html#108
       (box rv)                          ;; pointer to heap-allocated val
-      (struct s sts))                   ;; structs, with name and body 
+      (struct s sts))                   ;; structs, with name and body
+  
+  ;; A subset of rvalues that can be used inside other rvalues 
+  (operand (use lv)
+           const)
   
   ;; constants (can be evaluated at compile time)
   (const boolean
@@ -133,9 +136,10 @@
   (l variable-not-otherwise-mentioned)  ;; labels (i.e. block names)
   (s variable-not-otherwise-mentioned)) ;; struct names
 
-;; =========================================================
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluation
-;; =========================================================
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define-extended-language mir-machine mir
   ;; a state of the machine
   ;;    rv: a single rvalue ;;TODO: eventually work up to prog... 
@@ -185,6 +189,10 @@
    ;; (--> (in-hole E ((vec ty len) σ ρ)) Vector creation -- call a vec new fn?
    ;; boxes, structs, tuples
    ))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Metafunctions 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Perform the binary operation
 (define-metafunction mir-machine
