@@ -289,7 +289,44 @@
   update : σ α v -> σ
   [(update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)]
-  [(update (store (α_1 v_1) ...) α v) ,(error "address not in store:" (term α))]) 
+  [(update (store (α_1 v_1) ...) α v) ,(error "address not in store:" (term α))])
+
+;; remove : σ α len -> σ
+(define-metafunction mir-machine
+  ;; Remove len continuous blocks from the store starting at address α
+  remove : σ α len -> σ
+  [(remove σ α 0) σ]
+  [(remove (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0 len)
+   (remove (store (α_1 v_1) ... (α_2 v_2) ...)
+           ,(add1 (term α_0))
+           ,(sub1 (term len)))]
+  [(remove (store (α_1 v_1) ...) α len)
+   ,(error "address not found in store:" (term α))])
+
+;; copy : σ α α len -> σ
+(define-metafunction mir-machine
+  ;; Copy len continuous blocks starting from one address to another
+  copy : σ α α len -> σ
+  [(copy σ α_old α_new 0) σ]
+  ;; old address is in front of new address 
+  [(copy (store (α_1 v_1) ... (α_old v_tocopy) (α_2 v_2) ... (α_new v) (α_3 v_3) ...)
+         α_old α_new len)
+   (copy (store (α_1 v_1) ... (α_old v_tocopy) (α_2 v_2) ... (α_new v_tocopy) (α_3 v_3) ...)
+         ,(add1 (term α_old))
+         ,(add1 (term α_new))
+         ,(sub1 (term len)))]
+  ;; new address is in front of old address
+  [(copy (store (α_1 v_1) ... (α_new v) (α_2 v_2) ... (α_old v_tocopy) (α_3 v_3) ...)
+         α_old α_new len)
+   (copy (store (α_1 v_1) ... (α_new v_tocopy) (α_2 v_2) ... (α_old v_tocopy) (α_3 v_3) ...)
+         ,(add1 (term α_old))
+         ,(add1 (term α_new))
+         ,(sub1 (term len)))]
+  [(copy (store (α_1 v_1) ... (α_old v_tocopy) (α_2 v_2) ...) α_old α_new len)
+   ,(error "copy: attempted write to address not found in store:" (term α_new))]
+  [(copy (store (α_1 v_1) ...) α_old α_new len)
+   ,(error "copy: attempted read from address not found in store:" (term α_old))])
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Standard functions
@@ -312,17 +349,21 @@
   ;; FIXME assume we only have vectors of "heap values" (size 1) i.e. ptrs or nums
   ;; Defer to when we can look up the size of the type and calculate offset accordingly.
   vec-push : σ (vec α len cap) v -> (σ (vec α len cap))
-  ;; check if unallocated vector
-  [(vec-push σ (vec α_old 0 0) v) (vec-push ,(car (term (malloc σ 4)))
-                                            (vec ,(cadr (term (malloc σ 4))) 0 4)
-                                            v)]
-  ;; FIXME: deallocate old vector, and copy over contents.
-  [(vec-push σ (vec α_old len cap) v)
-   (vec-push ,(car (term (malloc σ ,(* (term cap) 2))))
-             (vec ,(cadr (term (malloc σ ,(* (term cap) 2)))) len ,(* (term cap) 2))
-             v)
-   (side-condition (equal? (term len) (term cap)))]
-  [(vec-push σ (vec α len cap) v) ((update σ ,(+ (term len) (term α)) v) 
-                                   (vec α ,(add1 (term len)) cap))])
+  [(vec-push σ (vec α_old 0 0) v)
+   (vec-push σ_new (vec α_new 0 4) v)
+   (where (σ_new α_new) (malloc σ 4))] 
+  [(vec-push σ (vec α len cap) v)
+   ((update σ ,(+ (term len) (term α)) v) (vec α ,(add1 (term len)) cap))
+   (side-condition (< (term len) (term cap)))]
+  [(vec-push σ (vec α_old len cap_old) v)
+   (vec-push σ_new (vec α_new len cap_new) v)
+   (where (σ_new (vec α_new len cap_new)) (vec-resize σ (vec α_old len cap_old)))])
 
-
+(define-metafunction mir-machine
+  ;; Resize vector, assign new address, copy over old contents 
+  vec-resize : σ (vec α len cap) -> (σ (vec α len cap))
+  [(vec-resize σ (vec α_old len cap_old))
+   (σ_remove_old (vec α_new len ,(* (term cap_old) 2)))
+   (where (σ_malloc_new α_new) (malloc σ ,(* (term cap_old) 2)))
+   (where σ_copy_old (copy σ_malloc_new α_old α_new len))
+   (where σ_remove_old (remove σ_copy_old α_old len))])
