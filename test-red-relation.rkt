@@ -58,14 +58,14 @@
 (rv-eval-tests)
 ;; =========================================================
 ;; env-lookup : ρ x -> α
-(check-exn exn:fail? (λ () (term (env-lookup (env) x))) "not found in environment: x")
-(check-exn exn:fail? (λ () (term (env-lookup (env (a 1)) c))) "not found in environment: c")
+(check-exn exn:fail? (λ () (term (env-lookup (env) x))) "env-lookup: variable not found in environment: x")
+(check-exn exn:fail? (λ () (term (env-lookup (env (a 1)) c))) "env-lookup: address not found in environment: c")
 (test-equal (term (env-lookup (env (a 1) (b 2) (c 3)) c)) 3)
 
 ;; =========================================================
 ;; store-lookup : σ α -> v
-(check-exn exn:fail? (λ () (term (store-lookup (store) 1))) "not found in store: 1")
-(check-exn exn:fail? (λ () (term (store-lookup (store (1 1) 0)))) "not found in store: 0")
+(check-exn exn:fail? (λ () (term (store-lookup (store) 1))) "store-lookup: address not found in store: 1")
+(check-exn exn:fail? (λ () (term (store-lookup (store (1 1) 0)))) "store-lookup: address not found in store: 0")
 (test-equal (term (store-lookup (store (1 111) (2 222) (3 333)) 3)) 333)
 
 ;; =========================================================
@@ -151,7 +151,7 @@
                           1 2))
             (term (store (3 void)
                          (0 void))))
-(check-exn exn:fail? (λ () (term (remove (store) 0 1))) "address not found in store: 1")
+(check-exn exn:fail? (λ () (term (remove (store) 0 1))) "remove: address not found in store: 1")
 
 ;; =========================================================
 ;; copy : σ α α len -> σ
