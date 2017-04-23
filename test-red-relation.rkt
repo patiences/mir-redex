@@ -53,6 +53,57 @@
   (test-->> run (term ((! #t) ,HEAP0 ,ENV0)) (term (#f ,HEAP0 ,ENV0)))
   (test-->> run (term ((< 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
   (test-->> run (term ((cast misc a as float) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
+  (test-->> run
+            (term ((= a 3) ,HEAP0 ,ENV0))
+            (term (void
+                   [store
+                   (13 1)
+                   (14 3) ; a
+                   (15 (ptr 14))
+                   (16 void)
+                   (17 (ptr 13))
+                   (18 15)]
+                   ,ENV0)))
+  (test-->> run
+            (term ((= a (+ 1 2)) ,HEAP0 ,ENV0))
+            (term (void
+                   [store
+                   (13 1)
+                   (14 3) ; a
+                   (15 (ptr 14))
+                   (16 void)
+                   (17 (ptr 13))
+                   (18 15)]
+                   ,ENV0)))
+  (test-->> run (term ((* x) ,HEAP0 ,ENV0))
+            (term ((ptr 14) ,HEAP0 ,ENV0)))
+  (test-->> run
+            (term ((= (* x) 3) ,HEAP0 ,ENV0))
+            (term (void
+                   [store
+                   (13 1)
+                   (14 3) ; a
+                   (15 (ptr 14))
+                   (16 void)
+                   (17 (ptr 13))
+                   (18 15)]
+                   ,ENV0)))
+  ;; projection to an invalid address. No bounds checks here? 
+  (check-exn exn:fail? (λ () (apply-reduction-relation* run (term ((= (· a 100) 123) ,HEAP0 ,ENV0))))
+             "update: address not found in store: 114")
+  (test-->> run
+            (term ((· a 0) ,HEAP0 ,ENV0))
+            (term ((ptr 14) ,HEAP0 ,ENV0)))
+  (test-->> run (term ((= (· a 2) 100) ,HEAP0 ,ENV0))
+            (term (void
+                   [store
+                   (13 1)
+                   (14 2) ; a
+                   (15 (ptr 14))
+                   (16 100) ;a.2
+                   (17 (ptr 13))
+                   (18 15)]
+                   ,ENV0)))
   (test-results))
 
 (rv-eval-tests)
@@ -126,8 +177,8 @@
 (test-equal (term (deref ,HEAP0 ,ENV0 y)) (term void))
 
 ;; =========================================================
-;; put : σ ρ x v -> σ
-(test-equal (term (put ,HEAP0 ,ENV0 x 1)) ; x is at address 15
+;; update : σ ρ x v -> σ
+(test-equal (term (update ,HEAP0 ,ENV0 x 1)) ; x is at address 15
             (term [store
                    (13 1)
                    (14 2)

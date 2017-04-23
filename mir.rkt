@@ -82,8 +82,7 @@
       (binop operand operand)           ;; binary operations 
       (unop operand)                    ;; unary operations
       (cast castkind lv as ty)          ;; typecasts
-      ;; FIXME: capacity? http://manishearth.github.io/rust-internals-docs///src/collections/vec.rs.html#296-299
-      (vec ty len)                      ;; vectors 
+      (vec α len cap)                   ;; vectors, with a base address, length and capacity  
       (operand ...)                     ;; aggregate values (i.e. tuples)
       ;; FIXME: is this the right information to keep in the box? 
       ;;        https://doc.rust-lang.org/src/alloc/boxed.rs.html#108
@@ -121,7 +120,7 @@
       bool                              ;; booleans 
       (struct s)                        ;; structs 
       (ty ...)                          ;; aggregate types (i.e. tuples) 
-      (vec ty len)                      ;; vectors 
+      (vec ty)                          ;; vectors 
       (& mq ty)                         ;; reference types with qualifiers
       (* mq ty)                         ;; raw pointer types with qualifiers
       (box ty)                          ;; box 
@@ -133,7 +132,8 @@
   
   (len integer)                         ;; vector length 
   (cap integer)                         ;; vector capacity 
-  
+
+  (α integer)                           ;; addresses 
   (x variable-not-otherwise-mentioned)  ;; variables 
   (f integer)                           ;; field names
   (g variable-not-otherwise-mentioned)  ;; function names
@@ -157,12 +157,17 @@
      void)                             ;; void (uninitialized)
   ;; Variable environment, vars mapped to their addresses in the heap 
   (ρ (env (x α) ...))
-  ;; Address 
-  (α number)
   ;; Evaluation contexts
   (E hole
      ;; P
      (E σ ρ)
+     ;; statements
+     (= E rv)
+     (= x E)
+     (= (ptr α) E)
+     ;; lvalues
+     (* E)
+     (· E f)
      ;; rvalues 
      (use E)
      (& borrowkind E)
@@ -192,8 +197,18 @@
    (--> ((in-hole E (cast castkind lv as ty)) σ ρ)
         ((in-hole E (eval-cast lv ty)) σ ρ)
         "typecast")
-   ;; (--> (in-hole E ((vec ty len) σ ρ)) Vector creation -- call a vec new fn?
-   ;; boxes, structs, tuples
+   (--> ((in-hole E (= x v)) σ ρ)
+        ((in-hole E void) (update σ ρ x v) ρ)
+        "update-var")
+   (--> ((in-hole E (= (ptr α) v)) σ ρ)
+        ((in-hole E void) (update-direct σ α v) ρ)
+        "update-direct")
+   (--> ((in-hole E (* x)) σ ρ)
+        ((in-hole E (deref σ ρ x)) σ ρ)
+        "deref")
+   (--> ((in-hole E (· x f)) σ ρ)
+        ((in-hole E (ptr ,(+ (term (env-lookup ρ x)) (term f)))) σ ρ)
+        "project")
    ))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -274,22 +289,22 @@
   [(store-lookup (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0) v_0]
   [(store-lookup (store (α_1 v_1) ...) α) ,(error "store-lookup: address not found in store:" (term α))])
 
-;; put : σ ρ x v -> σ
+;; update : σ ρ x v -> σ
 (define-metafunction mir-machine
   ;; Updates the value mapped to this variable in the heap
-  put : σ ρ x v -> σ
-  [(put (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
+  update : σ ρ x v -> σ
+  [(update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
    (where α_0 (env-lookup ρ x_0))]
-  [(put (store (α_1 v_1) ...) ρ x v) ,(error "put: address not found in store:" (term x))])
+  [(update (store (α_1 v_1) ...) ρ x v) ,(error "update: address not found in store:" (term x))])
 
-;; update : σ α v -> σ
+;; update-direct : σ α v -> σ
 (define-metafunction mir-machine
   ;; Updates the value at the address in the store
-  update : σ α v -> σ
-  [(update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
+  update-direct : σ α v -> σ
+  [(update-direct (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)]
-  [(update (store (α_1 v_1) ...) α v) ,(error "update: address not found in store:" (term α))])
+  [(update-direct (store (α_1 v_1) ...) α v) ,(error "update-direct: address not found in store:" (term α))])
 
 ;; remove : σ α len -> σ
 (define-metafunction mir-machine
@@ -353,7 +368,7 @@
    (vec-push σ_new (vec α_new 0 4) v)
    (where (σ_new α_new) (malloc σ 4))] 
   [(vec-push σ (vec α len cap) v)                           ;; not at capacity 
-   ((update σ ,(+ (term len) (term α)) v) (vec α ,(add1 (term len)) cap))
+   ((update-direct σ ,(+ (term len) (term α)) v) (vec α ,(add1 (term len)) cap))
    (side-condition (< (term len) (term cap)))]
   [(vec-push σ (vec α_old len cap_old) v)                   ;; at capacity, must resize (double current cap.)
    (vec-push σ_new (vec α_new len cap_new) v)

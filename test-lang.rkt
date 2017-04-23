@@ -394,15 +394,16 @@
 (define vec
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (mut _1 : (vec int 0)))
+            (scope scope1 (mut _1 : (vec int)))
             (mut _2 : unit-ty)
             (mut _3 : unit-ty)
-            (mut _4 : (& mut (vec int 0)))
-            (bb bb0 [] (call _1 <std::vec::Vec<T>><int>::new () bb1))
+            (mut _4 : (& mut (vec int)))
+                                ;; FIXME: how to make this call during reduction only
+            (bb bb0 [] (call _1 _vec-new () bb1))            ;; _1 = (vec α 0 0)
             (bb bb1 [(= _4 (& mut _1))] (call _3
-                                              <std::vec::Vec<T>><int>::push
+                                              _vec-push
                                               [(use _4)
-                                               1]
+                                               1]           ;; _3 = &mut (vec α 1 4)
                                               bb4))
             (bb bb2 [] resume)
             (bb bb3 [] (drop _1 bb2))
@@ -555,21 +556,19 @@
 (define vector-fun
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (mut _1 : (vec int 0))
+            (scope scope1 (mut _1 : (vec int))
                    (scope scope2 (_5 : int)))
             (mut _2 : unit-ty)
             (mut _3 : unit-ty)
-            (mut _4 : (& mut (vec int 0)))
+            (mut _4 : (& mut (vec int)))
             (mut _6 : int)
             (mut _7 : (& imm int))
-            (mut _8 : (& imm (vec int 0)))
-            ;;(bb bb0 [] (call _1 <std::vec::Vec<T>>::new () bb1)) ;; FIXME call or vec?
-            ;; Implement stdlib methods?
-            ;; https://doc.rust-lang.org/std/#what-is-in-the-standard-library-documentation
-            (bb bb0 [(= _1 (vec T 0))] (goto bb1))
-            (bb bb1 [(= _4 (& mut _1))] (call _3 <std::vec::Vec<T>>::push ((use _4) 1) bb4 bb3))
+            (mut _8 : (& imm (vec int)))
+            (bb bb0 [] (call _1 _vec-new () bb1)) 
+            (bb bb1 [(= _4 (& mut _1))] (call _3 _vec-push ((use _4) 1) bb4 bb3))
             (bb bb2 [] resume)
             (bb bb3 [] (drop _1 bb2))
+                                                    ;; TODO impl Index  
             (bb bb4 [(= _8 (& unique _1))] (call _7 std::ops::Index::index ((use _8) 0) bb5 bb3))))) ;; FIXME indexing
 
 (check-not-false (redex-match mir fn vector-fun))
@@ -655,6 +654,7 @@
             (mut _4 : (box int))
             (mut _6 : (* mut int))
             (bb bb0 [(= _1 (box 5))] (goto bb1))
+                                               ;; TODO Impl Box 
             (bb bb1 [(= _4 (use _1))] (call _3 <std::boxed::Box<T>>::into_raw ((use _4)) bb5 bb4))
             (bb bb2 [] resume)
             (bb bb3 [] (drop _1 bb2))
