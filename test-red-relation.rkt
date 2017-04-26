@@ -104,6 +104,20 @@
                    (17 (ptr 13))
                    (18 15)]
                    ,ENV0)))
+  (test-->> run (term (((= (· a 0) 1)
+                        (= (· a 1) 2)
+                        (= (· a 2) 3))
+                       ,HEAP0 ,ENV0))
+            (term ((void void void)
+                   [store
+                     (13 1)
+                     (14 1) ; a.0
+                     (15 2) ; a.1
+                     (16 3)
+                     (17 (ptr 13))
+                     (18 15)]
+                   ,ENV0)))
+            
   (test-results))
 
 (rv-eval-tests)

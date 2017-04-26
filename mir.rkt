@@ -162,6 +162,7 @@
      ;; P
      (E σ ρ)
      ;; statements
+     (void ... E st ...)
      (= E rv)
      (= x E)
      (= (ptr α) E)
@@ -197,12 +198,14 @@
    (--> ((in-hole E (cast castkind lv as ty)) σ ρ)
         ((in-hole E (eval-cast lv ty)) σ ρ)
         "typecast")
+   ;; Assignment
    (--> ((in-hole E (= x v)) σ ρ)
         ((in-hole E void) (update σ ρ x v) ρ)
         "update-var")
    (--> ((in-hole E (= (ptr α) v)) σ ρ)
         ((in-hole E void) (update-direct σ α v) ρ)
         "update-direct")
+   ;; Lvalues 
    (--> ((in-hole E (* x)) σ ρ)
         ((in-hole E (deref σ ρ x)) σ ρ)
         "deref")
