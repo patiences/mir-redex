@@ -146,10 +146,10 @@
 
 (define-extended-language mir-machine mir
   ;; a state of the machine
-  ;;    st: a single statement ;;TODO: eventually work up to prog... 
+  ;;    prog: the program 
   ;;    σ: the store (heap)
   ;;    ρ: the global variable table 
-  (P (st σ ρ))
+  (P (prog σ ρ))
   ;; the heap, addresses mapped to their heap value
   (σ (store (α v) ...))
   (v (ptr α)                           ;; pointer
@@ -170,6 +170,8 @@
          void ... E decl ...
          blk ...)
      ;(scope l void ... E decl ...) ; run local decls ;; FIXME create a new type env for this scope 
+     ;; basic blocks
+     (bb l E terminator) ; run statements
      ;; statements
      (void ... E st ...)
      (= E rv)

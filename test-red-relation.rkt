@@ -6,6 +6,7 @@
 ;; Tests for metafunctions
 
 ;; Constants for testing
+(define MT-ENV (term (env)))
 (define ENV0 (term [env 
                     (a 14)
                     (x 15)
@@ -13,6 +14,7 @@
                     (z 17)]))
 (check-not-false (redex-match mir-machine ρ ENV0))
 
+(define MT-HEAP (term (store)))
 (define HEAP0 (term [store
                      (13 1)
                      (14 2)
@@ -32,23 +34,23 @@
   (test-->> run (term ((x : int) ,HEAP0 ,ENV0 (tenv (x float))))
             (term (void ,HEAP0 ,ENV0 (tenv (x int)))))
   (test-->> run ;; no decls 
-           (term ((-> main () unit-ty
-                     void
-                     (bb bb0 () return))
-                 ,HEAP0 ,ENV0 (tenv)))
-           (term ((-> main () unit-ty
-                     void
-                     (bb bb0 () return))
-                 ,HEAP0 ,ENV0 (tenv)))) 
+            (term ((-> main () unit-ty
+                       void
+                       (bb bb0 () return))
+                   ,HEAP0 ,ENV0 (tenv)))
+            (term ((-> main () unit-ty
+                       void
+                       (bb bb0 () return))
+                   ,HEAP0 ,ENV0 (tenv)))) 
   (test-->> run ;; single vdecl inside a fn 
             (term ((-> main () unit-ty
                        (_0 : int)
                        (bb bb0 () return))
                    ,HEAP0 ,ENV0 (tenv)))
             (term ((-> main () unit-ty
-                     void
-                     (bb bb0 () return))
-                 ,HEAP0 ,ENV0 (tenv (_0 int)))))
+                       void
+                       (bb bb0 () return))
+                   ,HEAP0 ,ENV0 (tenv (_0 int)))))
   (test-->> run ;; multiple vdecls inside a fn 
             (term ((-> main () unit-ty
                        (a : int)
@@ -57,9 +59,9 @@
                        (bb bb0 () return))
                    ,HEAP0 ,ENV0 (tenv)))
             (term ((-> main () unit-ty
-                     void void void 
-                     (bb bb0 () return))
-                 ,HEAP0 ,ENV0 (tenv (c unit-ty) (b float) (a int)))))
+                       void void void 
+                       (bb bb0 () return))
+                   ,HEAP0 ,ENV0 (tenv (c unit-ty) (b float) (a int)))))
   (test-->> run ;; multiple vdecls inside a fn 
             (term ((-> main () unit-ty
                        (a : int)
@@ -68,36 +70,56 @@
                        (bb bb0 () return))
                    ,HEAP0 ,ENV0 (tenv (a unit-ty))))
             (term ((-> main () unit-ty
-                     void void void 
-                     (bb bb0 () return))
-                 ,HEAP0 ,ENV0 (tenv (c unit-ty) (b float) (a int)))))
+                       void void void 
+                       (bb bb0 () return))
+                   ,HEAP0 ,ENV0 (tenv (c unit-ty) (b float) (a int)))))
   
   (test-results))
 
 (fn-eval-tests)
 
+(define (bb-eval-tests)
+  (test-->> run
+            (term ((bb bb0 () return) ,MT-HEAP ,MT-ENV ,MT-TENV))
+            (term ((bb bb0 () return) ,MT-HEAP ,MT-ENV ,MT-TENV)))
+  (test-->> run
+            (term ((bb bb0
+                       ((= a 1)
+                        (= b 2))
+                       return)
+                   (store (1 void) (2 void)) ; statements expect variables to already be heap-initialized 
+                   (env (a 1) (b 2))
+                   (tenv (a int) (b int))))
+            (term ((bb bb0 (void void) return)
+                   (store (1 1) (2 2))
+                   (env (a 1) (b 2))
+                   (tenv (a int) (b int)))))
+  (test-results))
+
+(bb-eval-tests)
+
 (define (statement-eval-tests)
-    (test-->> run
+  (test-->> run
             (term ((= a 3) ,HEAP0 ,ENV0 ,MT-TENV))
             (term (void
                    [store
-                   (13 1)
-                   (14 3) ; a
-                   (15 (ptr 14))
-                   (16 void)
-                   (17 (ptr 13))
-                   (18 15)]
+                    (13 1)
+                    (14 3) ; a
+                    (15 (ptr 14))
+                    (16 void)
+                    (17 (ptr 13))
+                    (18 15)]
                    ,ENV0 ,MT-TENV)))
   (test-->> run
             (term ((= a (+ 1 2)) ,HEAP0 ,ENV0 ,MT-TENV))
             (term (void
                    [store
-                   (13 1)
-                   (14 3) ; a
-                   (15 (ptr 14))
-                   (16 void)
-                   (17 (ptr 13))
-                   (18 15)]
+                    (13 1)
+                    (14 3) ; a
+                    (15 (ptr 14))
+                    (16 void)
+                    (17 (ptr 13))
+                    (18 15)]
                    ,ENV0 ,MT-TENV)))
   (test-->> run (term ((* x) ,HEAP0 ,ENV0 ,MT-TENV))
             (term ((ptr 14) ,HEAP0 ,ENV0 ,MT-TENV)))
@@ -105,12 +127,12 @@
             (term ((= (* x) 3) ,HEAP0 ,ENV0 ,MT-TENV))
             (term (void
                    [store
-                   (13 1)
-                   (14 3) ; a
-                   (15 (ptr 14))
-                   (16 void)
-                   (17 (ptr 13))
-                   (18 15)]
+                    (13 1)
+                    (14 3) ; a
+                    (15 (ptr 14))
+                    (16 void)
+                    (17 (ptr 13))
+                    (18 15)]
                    ,ENV0 ,MT-TENV)))
   ;; projection to an invalid address. No bounds checks here? 
   (check-exn exn:fail? (λ () (apply-reduction-relation* run (term ((= (· a 100) 123) ,HEAP0 ,ENV0 ,MT-TENV))))
@@ -121,12 +143,12 @@
   (test-->> run (term ((= (· a 2) 100) ,HEAP0 ,ENV0 ,MT-TENV))
             (term (void
                    [store
-                   (13 1)
-                   (14 2) ; a
-                   (15 (ptr 14))
-                   (16 100) ;a.2
-                   (17 (ptr 13))
-                   (18 15)]
+                    (13 1)
+                    (14 2) ; a
+                    (15 (ptr 14))
+                    (16 100) ;a.2
+                    (17 (ptr 13))
+                    (18 15)]
                    ,ENV0 ,MT-TENV)))
   (test-->> run (term (((= (· a 0) 1)
                         (= (· a 1) 2)
@@ -134,12 +156,12 @@
                        ,HEAP0 ,ENV0 ,MT-TENV))
             (term ((void void void)
                    [store
-                     (13 1)
-                     (14 1) ; a.0
-                     (15 2) ; a.1
-                     (16 3)
-                     (17 (ptr 13))
-                     (18 15)]
+                    (13 1)
+                    (14 1) ; a.0
+                    (15 2) ; a.1
+                    (16 3)
+                    (17 (ptr 13))
+                    (18 15)]
                    ,ENV0 ,MT-TENV)))
   (test-results))
 
@@ -195,25 +217,25 @@
 (test-equal (term (store-extend (store) 1 0)) (term (store)))
 (test-equal (term (store-extend (store) 1 1)) (term [store (1 void)]))
 (test-equal (term (store-extend ,HEAP0 19 1)) (term [store
-                                               (19 void)
-                                               (13 1)
-                                               (14 2)
-                                               (15 (ptr 14))
-                                               (16 void)
-                                               (17 (ptr 13))
-                                               (18 15)]))
+                                                     (19 void)
+                                                     (13 1)
+                                                     (14 2)
+                                                     (15 (ptr 14))
+                                                     (16 void)
+                                                     (17 (ptr 13))
+                                                     (18 15)]))
 (test-equal (term (store-extend ,HEAP0 19 5)) (term [store
-                                               (23 void)
-                                               (22 void)
-                                               (21 void)
-                                               (20 void)
-                                               (19 void)
-                                               (13 1)
-                                               (14 2)
-                                               (15 (ptr 14))
-                                               (16 void)
-                                               (17 (ptr 13))
-                                               (18 15)]))
+                                                     (23 void)
+                                                     (22 void)
+                                                     (21 void)
+                                                     (20 void)
+                                                     (19 void)
+                                                     (13 1)
+                                                     (14 2)
+                                                     (15 (ptr 14))
+                                                     (16 void)
+                                                     (17 (ptr 13))
+                                                     (18 15)]))
 
 ;; =========================================================
 ;; malloc : σ len -> (σ α)
@@ -261,16 +283,16 @@
 ;; =========================================================
 ;; store-remove : σ α len -> σ
 (test-equal (term (store-remove (store (3 void)
-                                 (2 void)
-                                 (1 void)
-                                 (0 void))
-                          0 4))
+                                       (2 void)
+                                       (1 void)
+                                       (0 void))
+                                0 4))
             (term (store)))
 (test-equal (term (store-remove (store (3 void)
-                                 (2 void)
-                                 (1 void)
-                                 (0 void))
-                          1 2))
+                                       (2 void)
+                                       (1 void)
+                                       (0 void))
+                                1 2))
             (term (store (3 void)
                          (0 void))))
 (check-exn exn:fail? (λ () (term (store-remove (store) 0 1))) "store-remove: address not found in store: 1")
@@ -320,7 +342,7 @@
             (term int))
 (check-exn exn:fail? (λ () (term (tenv-lookup (tenv) a)))
            "tenv-lookup: variable not found in type environment: a")
-            
+
 ;; =========================================================
 ;; tenv-update : Γ x ty -> Γ
 (test-equal (term (tenv-update (tenv (a int)) a float))
@@ -332,7 +354,7 @@
 ;; tenv-add : Γ x ty -> Γ
 (test-equal (term (tenv-add (tenv) a int))
             (term (tenv (a int))))
-            ; this function does not check that the variable has not been defined 
+; this function does not check that the variable has not been defined 
 (test-equal (term (tenv-add (tenv (a int) (b int) (c int)) a float))
             (term (tenv (a float) (a int) (b int) (c int))))
 
