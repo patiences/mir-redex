@@ -78,7 +78,7 @@
 
 (define (statement-eval-tests)
     (test-->> run
-            (term ((= a 3) ,HEAP0 ,ENV0))
+            (term ((= a 3) ,HEAP0 ,ENV0 ,MT-TENV))
             (term (void
                    [store
                    (13 1)
@@ -87,9 +87,9 @@
                    (16 void)
                    (17 (ptr 13))
                    (18 15)]
-                   ,ENV0)))
+                   ,ENV0 ,MT-TENV)))
   (test-->> run
-            (term ((= a (+ 1 2)) ,HEAP0 ,ENV0))
+            (term ((= a (+ 1 2)) ,HEAP0 ,ENV0 ,MT-TENV))
             (term (void
                    [store
                    (13 1)
@@ -98,11 +98,11 @@
                    (16 void)
                    (17 (ptr 13))
                    (18 15)]
-                   ,ENV0)))
-  (test-->> run (term ((* x) ,HEAP0 ,ENV0))
-            (term ((ptr 14) ,HEAP0 ,ENV0)))
+                   ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((* x) ,HEAP0 ,ENV0 ,MT-TENV))
+            (term ((ptr 14) ,HEAP0 ,ENV0 ,MT-TENV)))
   (test-->> run
-            (term ((= (* x) 3) ,HEAP0 ,ENV0))
+            (term ((= (* x) 3) ,HEAP0 ,ENV0 ,MT-TENV))
             (term (void
                    [store
                    (13 1)
@@ -111,14 +111,14 @@
                    (16 void)
                    (17 (ptr 13))
                    (18 15)]
-                   ,ENV0)))
+                   ,ENV0 ,MT-TENV)))
   ;; projection to an invalid address. No bounds checks here? 
-  (check-exn exn:fail? (λ () (apply-reduction-relation* run (term ((= (· a 100) 123) ,HEAP0 ,ENV0))))
+  (check-exn exn:fail? (λ () (apply-reduction-relation* run (term ((= (· a 100) 123) ,HEAP0 ,ENV0 ,MT-TENV))))
              "store-update: address not found in store: 114")
   (test-->> run
-            (term ((· a 0) ,HEAP0 ,ENV0))
-            (term ((ptr 14) ,HEAP0 ,ENV0)))
-  (test-->> run (term ((= (· a 2) 100) ,HEAP0 ,ENV0))
+            (term ((· a 0) ,HEAP0 ,ENV0 ,MT-TENV))
+            (term ((ptr 14) ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((= (· a 2) 100) ,HEAP0 ,ENV0 ,MT-TENV))
             (term (void
                    [store
                    (13 1)
@@ -127,11 +127,11 @@
                    (16 100) ;a.2
                    (17 (ptr 13))
                    (18 15)]
-                   ,ENV0)))
+                   ,ENV0 ,MT-TENV)))
   (test-->> run (term (((= (· a 0) 1)
                         (= (· a 1) 2)
                         (= (· a 2) 3))
-                       ,HEAP0 ,ENV0))
+                       ,HEAP0 ,ENV0 ,MT-TENV))
             (term ((void void void)
                    [store
                      (13 1)
@@ -140,41 +140,41 @@
                      (16 3)
                      (17 (ptr 13))
                      (18 15)]
-                   ,ENV0)))
+                   ,ENV0 ,MT-TENV)))
   (test-results))
 
 (statement-eval-tests)
 
 (define (rv-eval-tests)  
-  (test-->> run (term ((use y) ,HEAP0 ,ENV0))
-            (term (void ,HEAP0 ,ENV0)))
-  (test-->> run (term ((use z) ,HEAP0 ,ENV0))
-            (term ((ptr 13) ,HEAP0 ,ENV0)))
-  (test-->> run (term ((& mut x) ,HEAP0 ,ENV0))
-            (term (15 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((+ 1 2) ,HEAP0 ,ENV0)) (term (3 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((- 4 -20) ,HEAP0 ,ENV0)) (term (24 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((* 5 6) ,HEAP0 ,ENV0)) (term (30 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((/ 6 3) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((< 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
-  (test-->> run (term ((% -10 3) ,HEAP0 ,ENV0)) (term (-1 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((use y) ,HEAP0 ,ENV0 ,MT-TENV))
+            (term (void ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((use z) ,HEAP0 ,ENV0 ,MT-TENV))
+            (term ((ptr 13) ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((& mut x) ,HEAP0 ,ENV0 ,MT-TENV))
+            (term (15 ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((+ 1 2) ,HEAP0 ,ENV0 ,MT-TENV)) (term (3 ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((- 4 -20) ,HEAP0 ,ENV0 ,MT-TENV)) (term (24 ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((* 5 6) ,HEAP0 ,ENV0 ,MT-TENV)) (term (30 ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((/ 6 3) ,HEAP0 ,ENV0 ,MT-TENV)) (term (2 ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((< 1 2) ,HEAP0 ,ENV0 ,MT-TENV)) (term (#t ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((% -10 3) ,HEAP0 ,ENV0 ,MT-TENV)) (term (-1 ,HEAP0 ,ENV0 ,MT-TENV)))
   (test-->> run
-            (term ((+ (use a) 1) ,HEAP0 ,ENV0)) ; a + 1
-            (term (3 ,HEAP0 ,ENV0)))
+            (term ((+ (use a) 1) ,HEAP0 ,ENV0 ,MT-TENV)) ; a + 1
+            (term (3 ,HEAP0 ,ENV0 ,MT-TENV)))
   (test-->> run
-            (term ((+ 1 (use a)) ,HEAP0 ,ENV0)) ; 1 + a
-            (term (3 ,HEAP0 ,ENV0)))
+            (term ((+ 1 (use a)) ,HEAP0 ,ENV0 ,MT-TENV)) ; 1 + a
+            (term (3 ,HEAP0 ,ENV0 ,MT-TENV)))
   (test-->> run
-            (term ((+ (use a) (use a)) ,HEAP0 ,ENV0))
-            (term (4 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((<< 8 2) ,HEAP0 ,ENV0)) (term (32 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((>> 8 2) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((== 1 2) ,HEAP0 ,ENV0)) (term (#f ,HEAP0 ,ENV0)))
-  (test-->> run (term ((!= 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
-  (test-->> run (term ((- 15) ,HEAP0 ,ENV0)) (term (-15 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((! #t) ,HEAP0 ,ENV0)) (term (#f ,HEAP0 ,ENV0)))
-  (test-->> run (term ((< 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
-  (test-->> run (term ((cast misc a as float) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
+            (term ((+ (use a) (use a)) ,HEAP0 ,ENV0 ,MT-TENV))
+            (term (4 ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((<< 8 2) ,HEAP0 ,ENV0 ,MT-TENV)) (term (32 ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((>> 8 2) ,HEAP0 ,ENV0 ,MT-TENV)) (term (2 ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((== 1 2) ,HEAP0 ,ENV0 ,MT-TENV)) (term (#f ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((!= 1 2) ,HEAP0 ,ENV0 ,MT-TENV)) (term (#t ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((- 15) ,HEAP0 ,ENV0 ,MT-TENV)) (term (-15 ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((! #t) ,HEAP0 ,ENV0 ,MT-TENV)) (term (#f ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((< 1 2) ,HEAP0 ,ENV0 ,MT-TENV)) (term (#t ,HEAP0 ,ENV0 ,MT-TENV)))
+  (test-->> run (term ((cast misc a as float) ,HEAP0 ,ENV0 ,MT-TENV)) (term (2 ,HEAP0 ,ENV0 ,MT-TENV)))
   (test-results))
 
 (rv-eval-tests)
