@@ -195,10 +195,17 @@
    mir-machine
    ;; Variable declarations
    (--> ((in-hole E (x : ty)) σ ρ Γ)
-        ((in-hole E void) σ ρ (tenv-update Γ x ty))
+        ((in-hole E void) σ_new ρ_new (tenv-add Γ x ty))
+        (where (σ_new α_new) (malloc σ (sizeof ty))) ;; Allocate space in the store for this variable.
+                                                     ;; This assumes that we only ever declare the same variable once. (TODO verify) 
+        (where (env (x_1 α_1) ...) ρ)
+        (where ρ_new (env (x α_new) (x_1 α_1) ...))
         "vdecl")
    (--> ((in-hole E (mq x : ty)) σ ρ Γ)
-        ((in-hole E void) σ ρ (tenv-update Γ x ty)) ;; FIXME: How to deal with mq? 
+        ((in-hole E void) σ_new ρ_new (tenv-add Γ x ty)) ;; FIXME: How to deal with mq?
+        (where (σ_new α_new) (malloc σ (sizeof ty)))
+        (where (env (x_1 α_1) ...) ρ)
+        (where ρ_new (env (x α_new) (x_1 α_1) ...))
         "vdecl with mq")
    ;; Rvalues 
    (--> ((in-hole E (use x_0)) σ ρ Γ) 
@@ -268,6 +275,11 @@
 (define-metafunction mir-machine
   eval-cast : lv ty -> rv
   [(eval-cast lv ty) (use lv)])
+
+;; sizeof : ty -> int ;; TODO implement some data structure to track type sizes 
+(define-metafunction mir-machine
+  sizeof : ty -> integer
+  [(sizeof ty) 1])
 
 ;; deref : σ ρ x -> v 
 (define-metafunction mir-machine

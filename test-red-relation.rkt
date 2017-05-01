@@ -29,51 +29,40 @@
 
 ;; =========================================================
 (define (fn-eval-tests)
-  (test-->> run (term ((x : int) ,HEAP0 ,ENV0 (tenv))) ;; a single vdecl
-            (term (void ,HEAP0 ,ENV0 (tenv (x int)))))
-  (test-->> run (term ((x : int) ,HEAP0 ,ENV0 (tenv (x float))))
-            (term (void ,HEAP0 ,ENV0 (tenv (x int)))))
+  (test-->> run (term ((x : int) ,MT-HEAP ,MT-ENV (tenv))) ;; a single vdecl
+            (term (void (store (0 void)) (env (x 0)) (tenv (x int)))))
   (test-->> run ;; no decls 
             (term ((-> main () unit-ty
                        void
                        (bb bb0 () return))
-                   ,HEAP0 ,ENV0 (tenv)))
+                   ,MT-HEAP,MT-ENV ,MT-TENV))
             (term ((-> main () unit-ty
                        void
                        (bb bb0 () return))
-                   ,HEAP0 ,ENV0 (tenv)))) 
+                   ,MT-HEAP ,MT-ENV ,MT-TENV))) 
   (test-->> run ;; single vdecl inside a fn 
             (term ((-> main () unit-ty
                        (_0 : int)
                        (bb bb0 () return))
-                   ,HEAP0 ,ENV0 (tenv)))
+                   ,MT-HEAP ,MT-ENV ,MT-TENV))
             (term ((-> main () unit-ty
                        void
                        (bb bb0 () return))
-                   ,HEAP0 ,ENV0 (tenv (_0 int)))))
+                   (store (0 void)) (env (_0 0)) (tenv (_0 int)))))
   (test-->> run ;; multiple vdecls inside a fn 
             (term ((-> main () unit-ty
                        (a : int)
                        (b : float)
                        (c : unit-ty)
+                       (mut d : int)
                        (bb bb0 () return))
-                   ,HEAP0 ,ENV0 (tenv)))
+                   ,MT-HEAP ,MT-ENV ,MT-TENV))
             (term ((-> main () unit-ty
-                       void void void 
+                       void void void void
                        (bb bb0 () return))
-                   ,HEAP0 ,ENV0 (tenv (c unit-ty) (b float) (a int)))))
-  (test-->> run ;; multiple vdecls inside a fn 
-            (term ((-> main () unit-ty
-                       (a : int)
-                       (b : float)
-                       (c : unit-ty)
-                       (bb bb0 () return))
-                   ,HEAP0 ,ENV0 (tenv (a unit-ty))))
-            (term ((-> main () unit-ty
-                       void void void 
-                       (bb bb0 () return))
-                   ,HEAP0 ,ENV0 (tenv (c unit-ty) (b float) (a int)))))
-  
+                   (store (3 void) (2 void) (1 void) (0 void))
+                   (env (d 3) (c 2) (b 1) (a 0))
+                   (tenv (d int) (c unit-ty) (b float) (a int)))))
   (test-results))
 
 (fn-eval-tests)
