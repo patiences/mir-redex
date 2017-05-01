@@ -394,10 +394,10 @@
 (define vec
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (mut _1 : (vec int)))
+            (scope scope1 (mut _1 : (vec int 0)))
             (mut _2 : unit-ty)
             (mut _3 : unit-ty)
-            (mut _4 : (& mut (vec int)))
+            (mut _4 : (& mut (vec int 0)))
                                 ;; FIXME: how to make this call during reduction only
             (bb bb0 [] (call _1 _vec-new () bb1))            ;; _1 = (vec α 0 0)
             (bb bb1 [(= _4 (& mut _1))] (call _3
@@ -556,14 +556,14 @@
 (define vector-fun
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (mut _1 : (vec int))
+            (scope scope1 (mut _1 : (vec int 0))
                    (scope scope2 (_5 : int)))
             (mut _2 : unit-ty)
             (mut _3 : unit-ty)
-            (mut _4 : (& mut (vec int)))
+            (mut _4 : (& mut (vec int 0)))
             (mut _6 : int)
             (mut _7 : (& imm int))
-            (mut _8 : (& imm (vec int)))
+            (mut _8 : (& imm (vec int 0)))
             (bb bb0 [] (call _1 _vec-new () bb1)) 
             (bb bb1 [(= _4 (& mut _1))] (call _3 _vec-push ((use _4) 1) bb4 bb3))
             (bb bb2 [] resume)

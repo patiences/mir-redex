@@ -120,7 +120,7 @@
       bool                              ;; booleans 
       (struct s)                        ;; structs 
       (ty ...)                          ;; aggregate types (i.e. tuples) 
-      (vec ty)                          ;; vectors 
+      (vec ty cap)                      ;; vectors 
       (& mq ty)                         ;; reference types with qualifiers
       (* mq ty)                         ;; raw pointer types with qualifiers
       (box ty)                          ;; box 
@@ -130,14 +130,13 @@
   ;; error messages
   (msg string)
   
-  (len integer)                         ;; vector length 
-  (cap integer)                         ;; vector capacity 
+  ((len cap) integer)                         ;; vector length, capacity  
   
   (α integer)                           ;; addresses 
   (x variable-not-otherwise-mentioned)  ;; variables 
-  (f integer)                           ;; field names
+  (f integer)                           ;; field "names"
   (g variable-not-otherwise-mentioned)  ;; function names
-  (l variable-not-otherwise-mentioned)  ;; labels (i.e. block names)
+  (l variable-not-otherwise-mentioned)  ;; labels (i.e. basic block names)
   (s variable-not-otherwise-mentioned)) ;; struct names
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -197,7 +196,9 @@
    (--> ((in-hole E (x : ty)) σ ρ Γ)
         ((in-hole E void) σ_new ρ_new (tenv-add Γ x ty))
         (where (σ_new α_new) (malloc σ (sizeof ty))) ;; Allocate space in the store for this variable.
-                                                     ;; This assumes that we only ever declare the same variable once. (TODO verify) 
+                                                     ;; This assumes that we only ever declare the same variable once. (TODO verify)
+                                                     ;; This creates an illegal pointer for vecs with capacity 0,
+                                                     ;; since we don't allocate space for vecs until they are initialized. TODO: verify OK
         (where (env (x_1 α_1) ...) ρ)
         (where ρ_new (env (x α_new) (x_1 α_1) ...))
         "vdecl")
@@ -276,10 +277,21 @@
   eval-cast : lv ty -> rv
   [(eval-cast lv ty) (use lv)])
 
-;; sizeof : ty -> int ;; TODO implement some data structure to track type sizes 
+;; sizeof : ty -> int  
 (define-metafunction mir-machine
   sizeof : ty -> integer
-  [(sizeof ty) 1])
+  [(sizeof unit-ty) 1]
+  [(sizeof int) 1]
+  [(sizeof uint) 1]
+  [(sizeof float) 1]
+  [(sizeof bool) 1]
+  [(sizeof ()) 0] ; base case for aggregate types 
+  [(sizeof (ty_1 ty_2 ...)) ,(+ (term (sizeof ty_1)) (term (sizeof (ty_2 ...))))]
+  [(sizeof (vec ty cap)) ,(* (term (sizeof ty)) (term cap))]
+  [(sizeof (& mq ty)) 1] ; reference
+  [(sizeof (* mq ty)) 1] ; pointer
+  [(sizeof (box ty)) 1] ; FIXME pointer? -- or do we need size of box contents? 
+  [(sizeof T) 0]) ; FIXME 
 
 ;; deref : σ ρ x -> v 
 (define-metafunction mir-machine

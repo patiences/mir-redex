@@ -29,8 +29,14 @@
 
 ;; =========================================================
 (define (fn-eval-tests)
-  (test-->> run (term ((x : int) ,MT-HEAP ,MT-ENV (tenv))) ;; a single vdecl
+  (test-->> run (term ((x : int) ,MT-HEAP ,MT-ENV (tenv))) ;; a single integer vdecl gets 1 block of memory
             (term (void (store (0 void)) (env (x 0)) (tenv (x int)))))
+  (test-->> run (term ((x : (vec int 4)) ,MT-HEAP ,MT-ENV ,MT-TENV)) ; vec w/ capacity = 4 gets 4 blocks
+            (term (void (store (3 void) (2 void) (1 void) (0 void))
+                        (env (x 0)) (tenv (x (vec int 4))))))
+  (test-->> run (term ((x : (int float int)) ,MT-HEAP ,MT-ENV ,MT-TENV)) ; triple of numbers 
+            (term (void (store (2 void) (1 void) (0 void))
+                        (env (x 0)) (tenv (x (int float int))))))
   (test-->> run ;; no decls 
             (term ((-> main () unit-ty
                        void
@@ -252,6 +258,11 @@
                     (17 (ptr 13))
                     (18 15)]
                    19)))
+
+;; =========================================================
+;; sizeof : ty -> int 
+(test-equal (term (sizeof (int float int))) (term 3))
+(test-equal (term (sizeof (vec int 4))) (term 4))
 
 ;; =========================================================
 ;; deref : σ ρ x -> v
