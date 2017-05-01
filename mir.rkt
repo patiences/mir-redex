@@ -161,14 +161,15 @@
   (Γ (tenv (x ty) ...))
   ;; Evaluation contexts
   (E hole
-     ;; P
+     ;; program
      (E σ ρ)
      ;; functions
      (E σ ρ Γ) 
      (-> g vdecls ty
          ;; Reduce declarations 
          void ... E decl ...
-         blk ...) 
+         blk ...)
+     ;(scope l void ... E decl ...) ; run local decls ;; FIXME create a new type env for this scope 
      ;; statements
      (void ... E st ...)
      (= E rv)
@@ -198,34 +199,34 @@
         ((in-hole E void) σ ρ (tenv-update Γ x ty)) ;; FIXME: How to deal with mq? 
         "vdecl with mq")
    ;; Rvalues 
-   (--> ((in-hole E (use x_0)) σ ρ) 
-        ((in-hole E (deref σ ρ x_0)) σ ρ)
+   (--> ((in-hole E (use x_0)) σ ρ Γ) 
+        ((in-hole E (deref σ ρ x_0)) σ ρ Γ)
         "use")
-   (--> ((in-hole E (& borrowkind x_0)) σ ρ) 
-        ((in-hole E (env-lookup ρ x_0)) σ ρ)
+   (--> ((in-hole E (& borrowkind x_0)) σ ρ Γ) 
+        ((in-hole E (env-lookup ρ x_0)) σ ρ Γ)
         "ref")
-   (--> ((in-hole E (binop const_1 const_2)) σ ρ)
-        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ)
+   (--> ((in-hole E (binop const_1 const_2)) σ ρ Γ)
+        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ Γ)
         "binop")
-   (--> ((in-hole E (unop const)) σ ρ)
-        ((in-hole E (eval-unop unop const)) σ ρ)
+   (--> ((in-hole E (unop const)) σ ρ Γ)
+        ((in-hole E (eval-unop unop const)) σ ρ Γ)
         "unop")
-   (--> ((in-hole E (cast castkind lv as ty)) σ ρ)
-        ((in-hole E (eval-cast lv ty)) σ ρ)
+   (--> ((in-hole E (cast castkind lv as ty)) σ ρ Γ)
+        ((in-hole E (eval-cast lv ty)) σ ρ Γ)
         "typecast")
    ;; Assignment
-   (--> ((in-hole E (= x v)) σ ρ)
-        ((in-hole E void) (store-update σ ρ x v) ρ)
+   (--> ((in-hole E (= x v)) σ ρ Γ)
+        ((in-hole E void) (store-update σ ρ x v) ρ Γ)
         "store-update-var")
-   (--> ((in-hole E (= (ptr α) v)) σ ρ)
-        ((in-hole E void) (store-update-direct σ α v) ρ)
+   (--> ((in-hole E (= (ptr α) v)) σ ρ Γ)
+        ((in-hole E void) (store-update-direct σ α v) ρ Γ)
         "store-update-direct")
    ;; Lvalues 
-   (--> ((in-hole E (* x)) σ ρ)
-        ((in-hole E (deref σ ρ x)) σ ρ)
+   (--> ((in-hole E (* x)) σ ρ Γ)
+        ((in-hole E (deref σ ρ x)) σ ρ Γ)
         "deref")
-   (--> ((in-hole E (· x f)) σ ρ)
-        ((in-hole E (ptr ,(+ (term (env-lookup ρ x)) (term f)))) σ ρ)
+   (--> ((in-hole E (· x f)) σ ρ Γ)
+        ((in-hole E (ptr ,(+ (term (env-lookup ρ x)) (term f)))) σ ρ Γ)
         "project")
    ))
 

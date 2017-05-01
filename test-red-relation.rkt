@@ -22,6 +22,9 @@
                      (18 15)]))
 (check-not-false (redex-match mir-machine σ HEAP0))
 
+(define MT-TENV (term (tenv)))
+(check-not-false (redex-match mir-machine Γ MT-TENV))
+
 ;; =========================================================
 (define (fn-eval-tests)
   (test-->> run (term ((x : int) ,HEAP0 ,ENV0 (tenv))) ;; a single vdecl
@@ -53,6 +56,17 @@
                        (c : unit-ty)
                        (bb bb0 () return))
                    ,HEAP0 ,ENV0 (tenv)))
+            (term ((-> main () unit-ty
+                     void void void 
+                     (bb bb0 () return))
+                 ,HEAP0 ,ENV0 (tenv (c unit-ty) (b float) (a int)))))
+  (test-->> run ;; multiple vdecls inside a fn 
+            (term ((-> main () unit-ty
+                       (a : int)
+                       (b : float)
+                       (c : unit-ty)
+                       (bb bb0 () return))
+                   ,HEAP0 ,ENV0 (tenv (a unit-ty))))
             (term ((-> main () unit-ty
                      void void void 
                      (bb bb0 () return))
