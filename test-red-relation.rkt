@@ -23,37 +23,47 @@
 (check-not-false (redex-match mir-machine σ HEAP0))
 
 ;; =========================================================
-(define (rv-eval-tests)  
-  (test-->> run (term ((use y) ,HEAP0 ,ENV0))
-            (term (void ,HEAP0 ,ENV0)))
-  (test-->> run (term ((use z) ,HEAP0 ,ENV0))
-            (term ((ptr 13) ,HEAP0 ,ENV0)))
-  (test-->> run (term ((& mut x) ,HEAP0 ,ENV0))
-            (term (15 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((+ 1 2) ,HEAP0 ,ENV0)) (term (3 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((- 4 -20) ,HEAP0 ,ENV0)) (term (24 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((* 5 6) ,HEAP0 ,ENV0)) (term (30 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((/ 6 3) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((< 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
-  (test-->> run (term ((% -10 3) ,HEAP0 ,ENV0)) (term (-1 ,HEAP0 ,ENV0)))
-  (test-->> run
-            (term ((+ (use a) 1) ,HEAP0 ,ENV0)) ; a + 1
-            (term (3 ,HEAP0 ,ENV0)))
-  (test-->> run
-            (term ((+ 1 (use a)) ,HEAP0 ,ENV0)) ; 1 + a
-            (term (3 ,HEAP0 ,ENV0)))
-  (test-->> run
-            (term ((+ (use a) (use a)) ,HEAP0 ,ENV0))
-            (term (4 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((<< 8 2) ,HEAP0 ,ENV0)) (term (32 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((>> 8 2) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((== 1 2) ,HEAP0 ,ENV0)) (term (#f ,HEAP0 ,ENV0)))
-  (test-->> run (term ((!= 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
-  (test-->> run (term ((- 15) ,HEAP0 ,ENV0)) (term (-15 ,HEAP0 ,ENV0)))
-  (test-->> run (term ((! #t) ,HEAP0 ,ENV0)) (term (#f ,HEAP0 ,ENV0)))
-  (test-->> run (term ((< 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
-  (test-->> run (term ((cast misc a as float) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
-  (test-->> run
+(define (fn-eval-tests)
+  (test-->> run (term ((x : int) ,HEAP0 ,ENV0 (tenv))) ;; a single vdecl
+            (term (void ,HEAP0 ,ENV0 (tenv (x int)))))
+  (test-->> run (term ((x : int) ,HEAP0 ,ENV0 (tenv (x float))))
+            (term (void ,HEAP0 ,ENV0 (tenv (x int)))))
+  (test-->> run ;; no decls 
+           (term ((-> main () unit-ty
+                     void
+                     (bb bb0 () return))
+                 ,HEAP0 ,ENV0 (tenv)))
+           (term ((-> main () unit-ty
+                     void
+                     (bb bb0 () return))
+                 ,HEAP0 ,ENV0 (tenv)))) 
+  (test-->> run ;; single vdecl inside a fn 
+            (term ((-> main () unit-ty
+                       (_0 : int)
+                       (bb bb0 () return))
+                   ,HEAP0 ,ENV0 (tenv)))
+            (term ((-> main () unit-ty
+                     void
+                     (bb bb0 () return))
+                 ,HEAP0 ,ENV0 (tenv (_0 int)))))
+  (test-->> run ;; multiple vdecls inside a fn 
+            (term ((-> main () unit-ty
+                       (a : int)
+                       (b : float)
+                       (c : unit-ty)
+                       (bb bb0 () return))
+                   ,HEAP0 ,ENV0 (tenv)))
+            (term ((-> main () unit-ty
+                     void void void 
+                     (bb bb0 () return))
+                 ,HEAP0 ,ENV0 (tenv (c unit-ty) (b float) (a int)))))
+  
+  (test-results))
+
+(fn-eval-tests)
+
+(define (statement-eval-tests)
+    (test-->> run
             (term ((= a 3) ,HEAP0 ,ENV0))
             (term (void
                    [store
@@ -90,7 +100,7 @@
                    ,ENV0)))
   ;; projection to an invalid address. No bounds checks here? 
   (check-exn exn:fail? (λ () (apply-reduction-relation* run (term ((= (· a 100) 123) ,HEAP0 ,ENV0))))
-             "update: address not found in store: 114")
+             "store-update: address not found in store: 114")
   (test-->> run
             (term ((· a 0) ,HEAP0 ,ENV0))
             (term ((ptr 14) ,HEAP0 ,ENV0)))
@@ -117,7 +127,40 @@
                      (17 (ptr 13))
                      (18 15)]
                    ,ENV0)))
-            
+  (test-results))
+
+(statement-eval-tests)
+
+(define (rv-eval-tests)  
+  (test-->> run (term ((use y) ,HEAP0 ,ENV0))
+            (term (void ,HEAP0 ,ENV0)))
+  (test-->> run (term ((use z) ,HEAP0 ,ENV0))
+            (term ((ptr 13) ,HEAP0 ,ENV0)))
+  (test-->> run (term ((& mut x) ,HEAP0 ,ENV0))
+            (term (15 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((+ 1 2) ,HEAP0 ,ENV0)) (term (3 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((- 4 -20) ,HEAP0 ,ENV0)) (term (24 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((* 5 6) ,HEAP0 ,ENV0)) (term (30 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((/ 6 3) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((< 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
+  (test-->> run (term ((% -10 3) ,HEAP0 ,ENV0)) (term (-1 ,HEAP0 ,ENV0)))
+  (test-->> run
+            (term ((+ (use a) 1) ,HEAP0 ,ENV0)) ; a + 1
+            (term (3 ,HEAP0 ,ENV0)))
+  (test-->> run
+            (term ((+ 1 (use a)) ,HEAP0 ,ENV0)) ; 1 + a
+            (term (3 ,HEAP0 ,ENV0)))
+  (test-->> run
+            (term ((+ (use a) (use a)) ,HEAP0 ,ENV0))
+            (term (4 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((<< 8 2) ,HEAP0 ,ENV0)) (term (32 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((>> 8 2) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((== 1 2) ,HEAP0 ,ENV0)) (term (#f ,HEAP0 ,ENV0)))
+  (test-->> run (term ((!= 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
+  (test-->> run (term ((- 15) ,HEAP0 ,ENV0)) (term (-15 ,HEAP0 ,ENV0)))
+  (test-->> run (term ((! #t) ,HEAP0 ,ENV0)) (term (#f ,HEAP0 ,ENV0)))
+  (test-->> run (term ((< 1 2) ,HEAP0 ,ENV0)) (term (#t ,HEAP0 ,ENV0)))
+  (test-->> run (term ((cast misc a as float) ,HEAP0 ,ENV0)) (term (2 ,HEAP0 ,ENV0)))
   (test-results))
 
 (rv-eval-tests)
@@ -134,10 +177,10 @@
 (test-equal (term (store-lookup (store (1 111) (2 222) (3 333)) 3)) 333)
 
 ;; =========================================================
-;; extend : σ α len -> σ
-(test-equal (term (extend (store) 1 0)) (term (store)))
-(test-equal (term (extend (store) 1 1)) (term [store (1 void)]))
-(test-equal (term (extend ,HEAP0 19 1)) (term [store
+;; store-extend : σ α len -> σ
+(test-equal (term (store-extend (store) 1 0)) (term (store)))
+(test-equal (term (store-extend (store) 1 1)) (term [store (1 void)]))
+(test-equal (term (store-extend ,HEAP0 19 1)) (term [store
                                                (19 void)
                                                (13 1)
                                                (14 2)
@@ -145,7 +188,7 @@
                                                (16 void)
                                                (17 (ptr 13))
                                                (18 15)]))
-(test-equal (term (extend ,HEAP0 19 5)) (term [store
+(test-equal (term (store-extend ,HEAP0 19 5)) (term [store
                                                (23 void)
                                                (22 void)
                                                (21 void)
@@ -191,8 +234,8 @@
 (test-equal (term (deref ,HEAP0 ,ENV0 y)) (term void))
 
 ;; =========================================================
-;; update : σ ρ x v -> σ
-(test-equal (term (update ,HEAP0 ,ENV0 x 1)) ; x is at address 15
+;; store-update : σ ρ x v -> σ
+(test-equal (term (store-update ,HEAP0 ,ENV0 x 1)) ; x is at address 15
             (term [store
                    (13 1)
                    (14 2)
@@ -202,21 +245,21 @@
                    (18 15)]))
 
 ;; =========================================================
-;; remove : σ α len -> σ
-(test-equal (term (remove (store (3 void)
+;; store-remove : σ α len -> σ
+(test-equal (term (store-remove (store (3 void)
                                  (2 void)
                                  (1 void)
                                  (0 void))
                           0 4))
             (term (store)))
-(test-equal (term (remove (store (3 void)
+(test-equal (term (store-remove (store (3 void)
                                  (2 void)
                                  (1 void)
                                  (0 void))
                           1 2))
             (term (store (3 void)
                          (0 void))))
-(check-exn exn:fail? (λ () (term (remove (store) 0 1))) "remove: address not found in store: 1")
+(check-exn exn:fail? (λ () (term (store-remove (store) 0 1))) "store-remove: address not found in store: 1")
 
 ;; =========================================================
 ;; copy : σ α α len -> σ
@@ -256,6 +299,28 @@
            "copy: attempted read from address not found in store: 100")
 (check-exn exn:fail? (λ () (term (copy (store (100 100)) 100 101 1)))
            "copy: attempted write to address not found in store: 101")
+
+;; =========================================================
+;; tenv-lookup : Γ x -> ty
+(test-equal (term (tenv-lookup (tenv (a int) (b float)) a))
+            (term int))
+(check-exn exn:fail? (λ () (term (tenv-lookup (tenv) a)))
+           "tenv-lookup: variable not found in type environment: a")
+            
+;; =========================================================
+;; tenv-update : Γ x ty -> Γ
+(test-equal (term (tenv-update (tenv (a int)) a float))
+            (term (tenv (a float))))
+(test-equal (term (tenv-update (tenv) a int))
+            (term (tenv (a int))))
+
+;; =========================================================
+;; tenv-add : Γ x ty -> Γ
+(test-equal (term (tenv-add (tenv) a int))
+            (term (tenv (a int))))
+            ; this function does not check that the variable has not been defined 
+(test-equal (term (tenv-add (tenv (a int) (b int) (c int)) a float))
+            (term (tenv (a float) (a int) (b int) (c int))))
 
 ;; =========================================================
 ;; vec-new : σ -> (σ (vec α len cap))

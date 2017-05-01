@@ -132,7 +132,7 @@
   
   (len integer)                         ;; vector length 
   (cap integer)                         ;; vector capacity 
-
+  
   (α integer)                           ;; addresses 
   (x variable-not-otherwise-mentioned)  ;; variables 
   (f integer)                           ;; field names
@@ -146,10 +146,10 @@
 
 (define-extended-language mir-machine mir
   ;; a state of the machine
-  ;;    rv: a single rvalue ;;TODO: eventually work up to prog... 
+  ;;    st: a single statement ;;TODO: eventually work up to prog... 
   ;;    σ: the store (heap)
   ;;    ρ: the global variable table 
-  (P (rv σ ρ))
+  (P (st σ ρ))
   ;; the heap, addresses mapped to their heap value
   (σ (store (α v) ...))
   (v (ptr α)                           ;; pointer
@@ -157,10 +157,18 @@
      void)                             ;; void (uninitialized)
   ;; Variable environment, vars mapped to their addresses in the heap 
   (ρ (env (x α) ...))
+  ;; Typing environment, variables mapped to their data types  
+  (Γ (tenv (x ty) ...))
   ;; Evaluation contexts
   (E hole
      ;; P
      (E σ ρ)
+     ;; functions
+     (E σ ρ Γ) 
+     (-> g vdecls ty
+         ;; Reduce declarations 
+         void ... E decl ...
+         blk ...) 
      ;; statements
      (void ... E st ...)
      (= E rv)
@@ -182,6 +190,13 @@
 (define run
   (reduction-relation
    mir-machine
+   ;; Variable declarations
+   (--> ((in-hole E (x : ty)) σ ρ Γ)
+        ((in-hole E void) σ ρ (tenv-update Γ x ty))
+        "vdecl")
+   (--> ((in-hole E (mq x : ty)) σ ρ Γ)
+        ((in-hole E void) σ ρ (tenv-update Γ x ty)) ;; FIXME: How to deal with mq? 
+        "vdecl with mq")
    ;; Rvalues 
    (--> ((in-hole E (use x_0)) σ ρ) 
         ((in-hole E (deref σ ρ x_0)) σ ρ)
@@ -200,11 +215,11 @@
         "typecast")
    ;; Assignment
    (--> ((in-hole E (= x v)) σ ρ)
-        ((in-hole E void) (update σ ρ x v) ρ)
-        "update-var")
+        ((in-hole E void) (store-update σ ρ x v) ρ)
+        "store-update-var")
    (--> ((in-hole E (= (ptr α) v)) σ ρ)
-        ((in-hole E void) (update-direct σ α v) ρ)
-        "update-direct")
+        ((in-hole E void) (store-update-direct σ α v) ρ)
+        "store-update-direct")
    ;; Lvalues 
    (--> ((in-hole E (* x)) σ ρ)
         ((in-hole E (deref σ ρ x)) σ ρ)
@@ -266,17 +281,17 @@
   [(malloc σ_old len) (σ_new α_new)
                       (where (store (α_old v) ...) σ_old)
                       (where α_new ,(add1 (apply max (term (-1 α_old ...)))))
-                      (where σ_new (extend σ_old α_new len))])
+                      (where σ_new (store-extend σ_old α_new len))])
 
-;; extend : σ α len -> σ
+;; store-extend : σ α len -> σ
 (define-metafunction mir-machine
   ;; Extends the heap with len blocks, starting at the given address 
-  extend : σ α len -> σ
-  [(extend σ α_new 0) σ]
-  [(extend (store (α_old v) ...) α_new len)
-   (extend (store (α_new void) (α_old v) ...)
-           ,(add1 (term α_new))
-           ,(sub1 (term len)))])
+  store-extend : σ α len -> σ
+  [(store-extend σ α_new 0) σ]
+  [(store-extend (store (α_old v) ...) α_new len)
+   (store-extend (store (α_new void) (α_old v) ...)
+                 ,(add1 (term α_new))
+                 ,(sub1 (term len)))])
 
 ;; env-lookup : ρ x -> α
 (define-metafunction mir-machine
@@ -292,34 +307,34 @@
   [(store-lookup (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0) v_0]
   [(store-lookup (store (α_1 v_1) ...) α) ,(error "store-lookup: address not found in store:" (term α))])
 
-;; update : σ ρ x v -> σ
+;; store-update : σ ρ x v -> σ
 (define-metafunction mir-machine
   ;; Updates the value mapped to this variable in the heap
-  update : σ ρ x v -> σ
-  [(update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
+  store-update : σ ρ x v -> σ
+  [(store-update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
    (where α_0 (env-lookup ρ x_0))]
-  [(update (store (α_1 v_1) ...) ρ x v) ,(error "update: address not found in store:" (term x))])
+  [(store-update (store (α_1 v_1) ...) ρ x v) ,(error "store-update: address not found in store:" (term x))])
 
-;; update-direct : σ α v -> σ
+;; store-update-direct : σ α v -> σ
 (define-metafunction mir-machine
   ;; Updates the value at the address in the store
-  update-direct : σ α v -> σ
-  [(update-direct (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
+  store-update-direct : σ α v -> σ
+  [(store-update-direct (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)]
-  [(update-direct (store (α_1 v_1) ...) α v) ,(error "update-direct: address not found in store:" (term α))])
+  [(store-update-direct (store (α_1 v_1) ...) α v) ,(error "store-update-direct: address not found in store:" (term α))])
 
-;; remove : σ α len -> σ
+;; store-remove : σ α len -> σ
 (define-metafunction mir-machine
   ;; Remove len continuous blocks from the store starting at address α
-  remove : σ α len -> σ
-  [(remove σ α 0) σ]
-  [(remove (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0 len)
-   (remove (store (α_1 v_1) ... (α_2 v_2) ...)
-           ,(add1 (term α_0))
-           ,(sub1 (term len)))]
-  [(remove (store (α_1 v_1) ...) α len)
-   ,(error "remove: address not found in store:" (term α))])
+  store-remove : σ α len -> σ
+  [(store-remove σ α 0) σ]
+  [(store-remove (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0 len)
+   (store-remove (store (α_1 v_1) ... (α_2 v_2) ...)
+                 ,(add1 (term α_0))
+                 ,(sub1 (term len)))]
+  [(store-remove (store (α_1 v_1) ...) α len)
+   ,(error "store-remove: address not found in store:" (term α))])
 
 ;; copy : σ α α len -> σ
 (define-metafunction mir-machine
@@ -345,6 +360,27 @@
   [(copy (store (α_1 v_1) ...) α_old α_new len)
    ,(error "copy: attempted read from address not found in store:" (term α_old))])
 
+;; tenv-lookup: Γ x -> ty 
+(define-metafunction mir-machine
+  ;; Lookup the type of the variable x in the type env 
+  tenv-lookup : Γ x -> ty
+  [(tenv-lookup (tenv (x_1 ty_1) ... (x_0 ty_0) (x_2 ty_2) ...) x_0) ty_0]
+  [(tenv-lookup (tenv (x_1 ty_1) ...) x) ,(error "tenv-lookup: variable not found in type environment:" (term x))])
+
+;; tenv-update : Γ x ty -> Γ
+(define-metafunction mir-machine
+  ;; Update the type of this variable in the type env
+  tenv-update : Γ x ty -> Γ
+  [(tenv-update (tenv (x_1 ty_1) ... (x_0 ty_old) (x_2 ty_2) ...) x_0 ty_new)
+   (tenv (x_1 ty_1) ... (x_0 ty_new) (x_2 ty_2) ...)]
+  ;; Not yet defined in tenv, let's add it 
+  [(tenv-update (tenv (x_1 ty_1) ...) x ty) (tenv-add (tenv (x_1 ty_1) ...) x ty)])
+
+;; tenv-add : Γ x ty -> Γ
+(define-metafunction mir-machine
+  ;; Add this variable and its type to the type env
+  tenv-add : Γ x ty -> Γ
+  [(tenv-add (tenv (x_1 ty_1) ...) x ty) (tenv (x ty) (x_1 ty_1) ...)])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Standard functions
@@ -371,7 +407,7 @@
    (vec-push σ_new (vec α_new 0 4) v)
    (where (σ_new α_new) (malloc σ 4))] 
   [(vec-push σ (vec α len cap) v)                           ;; not at capacity 
-   ((update-direct σ ,(+ (term len) (term α)) v) (vec α ,(add1 (term len)) cap))
+   ((store-update-direct σ ,(+ (term len) (term α)) v) (vec α ,(add1 (term len)) cap))
    (side-condition (< (term len) (term cap)))]
   [(vec-push σ (vec α_old len cap_old) v)                   ;; at capacity, must resize (double current cap.)
    (vec-push σ_new (vec α_new len cap_new) v)
@@ -384,4 +420,4 @@
    (σ_remove_old (vec α_new len ,(* (term cap_old) 2)))
    (where (σ_malloc_new α_new) (malloc σ ,(* (term cap_old) 2)))
    (where σ_copy_old (copy σ_malloc_new α_old α_new len))
-   (where σ_remove_old (remove σ_copy_old α_old len))])
+   (where σ_remove_old (store-remove σ_copy_old α_old len))])
