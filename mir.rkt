@@ -22,10 +22,10 @@
   ;;    vdecls: parameters
   ;;    ty: return type
   ;;    decl ...: list of variable declarations and local scopes
-  ;;    promoted ...: list of rvalues promoted from this fn
-  ;;                  (fn of a constant, i.e. with a separate set of local decls than this fn) 
+  ;;    prm ...: list of rvalues promoted from this fn
+  ;;             (fn of a constant, i.e. with a separate set of local decls than this fn) 
   ;;    blk ...: list of basic blocks
-  (fn (-> g vdecls ty decl ... promoted ... blk ...))
+  (fn (-> g vdecls ty decl ... prm ... blk ...))
   
   ;; declaration
   ;;    vdecl: single variable declaration
@@ -42,19 +42,25 @@
   (mq mut imm)
   
   ;; scope
-  ;;    l: label
+  ;;    idx: index of this scope in this function's list of scopes 
   ;;    vdecls: list of (local) variable declarations
   ;;    scps: list of (nested) scopes 
-  (scp (scope l decl ...))
+  (scp (scope idx decl ...))
 
-  ;; promoted rvalues, which is like a separate function 
-  (promoted fn)
+  ;; promoted rvalues
+  ;;    idx: index of this promoted block in the enclosing function
+  ;;    vdecls: parameters
+  ;;    ty: return type
+  ;;    decl ... : list of local variable declarations and scopes 
+  ;;    prm ... : list of nested promoted blocks (is this even possible?)
+  ;;    blk ... : list of basic blocks 
+  (prm (promoted idx vdecls ty decl ... prm ... blk ...)) ; Essentially a fn with an index, instead of a name 
   
   ;; basic block
-  ;;    l: label
+  ;;    idx: index of this block in this function's list of blocks 
   ;;    sts: list of statements
   ;;    terminator: connection to subsequent basic blocks  
-  (blk (bb l sts terminator))
+  (blk (bb idx sts terminator))
   
   ;; statements 
   (sts (st ...))
@@ -64,18 +70,18 @@
   (terminator return                    ;; return to caller
               resume                    ;; emitted by diverge call during unwinding 
               (switchInt lv             ;; switch on an integer, branching to bb l 
-                         (const l) ...
-                         (otherwise l))
-              (assert rv l msg)         ;; checked branch
+                         (const idx) ...
+                         (otherwise idx))
+              (assert rv idx msg)         ;; checked branch
               ;;    rv: condition
-              ;;    l: block to branch to, if rv evals to true
+              ;;    idx: index of block to branch to, if rv evals to true
               ;;    msg: error message, if rv evals to false
-              (assert rv l l msg)       ;; as above, with extra unwinding label 
-              (call lv g rvs l)         ;; lv gets the result of calling g(rvs), branch to l on return  
-              (call lv g rvs l l)       ;; as above, with extra unwinding label  
-              (goto l)                  ;; goto l
-              (drop lv l)               ;; drop lv, goto l 
-              (drop lv l l))            ;; as above, with extra unwinding label 
+              (assert rv idx idx msg)       ;; as above, with extra unwinding label 
+              (call lv g rvs idx)         ;; lv gets the result of calling g(rvs), branch to l on return  
+              (call lv g rvs idx idx)       ;; as above, with extra unwinding label  
+              (goto idx)                  ;; goto l
+              (drop lv idx)               ;; drop lv, goto l 
+              (drop lv idx idx))            ;; as above, with extra unwinding label 
   
   ;; lvalues
   (lvs (lv ...))
@@ -143,11 +149,11 @@
   
   ((len cap) integer)                         ;; vector length, capacity  
   
-  (α integer)                           ;; addresses 
+  (α integer)                           ;; addresses
+  (idx integer)                         ;; indices 
   (x variable-not-otherwise-mentioned)  ;; variables 
   (f integer)                           ;; field "names"
   (g variable-not-otherwise-mentioned)  ;; function names
-  (l variable-not-otherwise-mentioned)  ;; labels (i.e. basic block names)
   (s variable-not-otherwise-mentioned)  ;; struct names
   (T variable-not-otherwise-mentioned)) ;; generic type names 
 

@@ -17,7 +17,7 @@
 (define empty-main
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (bb bb0
+            (bb 0
                 [(= _0 unit)]
                 return))))
 
@@ -43,8 +43,8 @@
 (define if-else-simple
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (mut _1 : int))
-            (bb bb0
+            (scope 1 (mut _1 : int))
+            (bb 0
                 [(= _1 1)
                  (= _0 unit)]
                 return))))
@@ -70,8 +70,8 @@
 (define struct-creation
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (_1 : (struct Point)))
-            (bb bb0
+            (scope 1 (_1 : (struct Point)))
+            (bb 0
                 [(= _1 (struct Point [(= x 4)
                                       (= y 5)]))
                  (= _0 unit)]
@@ -99,8 +99,8 @@
 (define not
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (_1 : bool))
-            (bb bb0
+            (scope 1 (_1 : bool))
+            (bb 0
                 [(= _1 (! #true)) 
                  (= _0 unit)]
                 return))))
@@ -192,13 +192,13 @@
   (term [(-> main () unit-ty
              (mut _0 : unit-ty)
              (mut _1 : bool)
-             (bb bb0 [] (call _1
+             (bb 0 [] (call _1
                               foo [0 10 5]
-                              bb1))
-             (bb bb1 [(= _0 unit)] return))
+                              1))
+             (bb 1 [(= _0 unit)] return))
          (-> foo [(_1 : int) (_2 : int) (_3 : int)] bool
              (mut _0 : unit-ty)
-             (scope scope1
+             (scope 1
                     (_4 : int)
                     (_5 : int)
                     (_6 : int))
@@ -208,21 +208,21 @@
              (mut _10 : int)
              (mut _11 : int)
              (mut _12 : int)
-             (bb bb0
+             (bb 0
                  [(= _4 (use _1))
                   (= _5 (use _2))
                   (= _6 (use _3))
                   (= _8 (use _4))
                   (= _9 (use _6))
                   (= _7 (< (use _8) (use _9)))]
-                 (switchInt _10 (0 bb3) (otherwise bb1)))
-             (bb bb1 [(= _1 #true)] (goto bb4))
-             (bb bb2 [(= _1 #false)] (goto bb4))
-             (bb bb3 [(= _11 (use _6))
+                 (switchInt _10 (0 3) (otherwise 1)))
+             (bb 1 [(= _1 #true)] (goto 4))
+             (bb 2 [(= _1 #false)] (goto 4))
+             (bb 3 [(= _11 (use _6))
                       (= _12 (use _5))
                       (= _10 (< (use _11) (use _12)))]
-                 (switchInt _10 (0 bb3) (otherwise bb1)))
-             (bb bb4 [] return))]))
+                 (switchInt _10 (0 3) (otherwise 1)))
+             (bb 4 [] return))]))
 
 (check-not-false (redex-match mir prog logical-or))
 
@@ -256,11 +256,11 @@
 (define tuple
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1
+            (scope 1
                    (_1 : (int int))
-                   (scope scope2 (_2 : int)))
+                   (scope 2 (_2 : int)))
             (mut _3 : int)
-            (bb bb0
+            (bb 0
                 [(= _1 (1 2))
                  (= _3 (use (· _1  0)))
                  (= _2 (use _3))
@@ -299,11 +299,11 @@
 (define downcast
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1
+            (scope 1
                    (_1 : float)
-                   (scope scope2 (_2 : int)))
+                   (scope 2 (_2 : int)))
             (mut _3 : float)
-            (bb bb0
+            (bb 0
                 [(= _1 1)
                  (= _3 (use _1))
                  (= _2 (cast misc _3 as int))
@@ -338,12 +338,12 @@
 (define add
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (_1 : int))
+            (scope 1 (_1 : int))
             (_2 : (int bool))
-            (bb bb0
+            (bb 0
                 [(= _2 (+ 1 2))]
                 (assert (! (use (· _2 1)))
-                        bb1
+                        1
                         "attempt to add with overflow")))))
 
 (check-not-false (redex-match mir fn add))
@@ -394,21 +394,21 @@
 (define vec
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (mut _1 : (vec int 0)))
+            (scope 1 (mut _1 : (vec int 0)))
             (mut _2 : unit-ty)
             (mut _3 : unit-ty)
             (mut _4 : (& mut (vec int 0)))
                                 ;; FIXME: how to make this call during reduction only
-            (bb bb0 [] (call _1 _vec-new () bb1))            ;; _1 = (vec α 0 0)
-            (bb bb1 [(= _4 (& mut _1))] (call _3
+            (bb 0 [] (call _1 _vec-new () 1))            ;; _1 = (vec α 0 0)
+            (bb 1 [(= _4 (& mut _1))] (call _3
                                               _vec-push
                                               [(use _4)
                                                1]           ;; _3 = &mut (vec α 1 4)
-                                              bb4))
-            (bb bb2 [] resume)
-            (bb bb3 [] (drop _1 bb2))
-            (bb bb4 [(= _0 unit)] (drop _1 bb5))
-            (bb bb5 [] return))))
+                                              4))
+            (bb 2 [] resume)
+            (bb 3 [] (drop _1 2))
+            (bb 4 [(= _0 unit)] (drop _1 5))
+            (bb 5 [] return))))
 
 (check-not-false (redex-match mir fn vec))
 
@@ -472,21 +472,21 @@
 (define match
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (_1 : int)
-                   (scope scope2 (_2 : int)
-                          (scope scope3 (_3 : int))))
+            (scope 1 (_1 : int)
+                   (scope 2 (_2 : int)
+                          (scope 3 (_3 : int))))
             (mut _4 : int)
             (mut _5 : (int bool))
-            (bb bb0
+            (bb 0
                 [(= _1 17)
                  (= _2 2)]
-                (switchInt _2 (1 bb1) (2 bb2) (otherwise bb3)))
-            (bb bb1 [(= _3 111)] (goto bb4))
-            (bb bb2 [(= _3 222)] (goto bb4))
-            (bb bb3 [(= _4 (use _1)) (= _5 (>> (use _4) 2))]
-                (assert (! (use (· _5 1))) bb5 "attempt to shift right with overflow"))
-            (bb bb4 [(= _0 unit)] return)
-            (bb bb5 [(= _3 (use (· _5 0)))] (goto bb4)))))
+                (switchInt _2 (1 1) (2 2) (otherwise 3)))
+            (bb 1 [(= _3 111)] (goto 4))
+            (bb 2 [(= _3 222)] (goto 4))
+            (bb 3 [(= _4 (use _1)) (= _5 (>> (use _4) 2))]
+                (assert (! (use (· _5 1))) 5 "attempt to shift right with overflow"))
+            (bb 4 [(= _0 unit)] return)
+            (bb 5 [(= _3 (use (· _5 0)))] (goto 4)))))
 
 (check-not-false (redex-match mir fn match))
 
@@ -556,20 +556,20 @@
 (define vector-fun
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (mut _1 : (vec int 0))
-                   (scope scope2 (_5 : int)))
+            (scope 1 (mut _1 : (vec int 0))
+                   (scope 2 (_5 : int)))
             (mut _2 : unit-ty)
             (mut _3 : unit-ty)
             (mut _4 : (& mut (vec int 0)))
             (mut _6 : int)
             (mut _7 : (& imm int))
             (mut _8 : (& imm (vec int 0)))
-            (bb bb0 [] (call _1 _vec-new () bb1)) 
-            (bb bb1 [(= _4 (& mut _1))] (call _3 _vec-push ((use _4) 1) bb4 bb3))
-            (bb bb2 [] resume)
-            (bb bb3 [] (drop _1 bb2))
+            (bb 0 [] (call _1 _vec-new () 1)) 
+            (bb 1 [(= _4 (& mut _1))] (call _3 _vec-push ((use _4) 1) 4 3))
+            (bb 2 [] resume)
+            (bb 3 [] (drop _1 2))
                                                     ;; TODO impl Index  
-            (bb bb4 [(= _8 (& unique _1))] (call _7 std::ops::Index::index ((use _8) 0) bb5 bb3))))) ;; FIXME indexing
+            (bb 4 [(= _8 (& unique _1))] (call _7 std::ops::Index::index ((use _8) 0) 5 3))))) ;; FIXME indexing
 
 (check-not-false (redex-match mir fn vector-fun))
 
@@ -647,23 +647,23 @@
 (define box-fun
   (term (-> main () unit-ty
             (mut _0 : unit-ty)
-            (scope scope1 (mut _1 : (box int))
-                   (scope scope2 (_3 : (* mut int))
-                          (scope scope3 (_5 : (box int)))))
+            (scope 1 (mut _1 : (box int))
+                   (scope 2 (_3 : (* mut int))
+                          (scope 3 (_5 : (box int)))))
             (mut _3 : unit-ty)
             (mut _4 : (box int))
             (mut _6 : (* mut int))
-            (bb bb0 [(= _1 (box 5))] (goto bb1))
+            (bb 0 [(= _1 (box 5))] (goto 1))
                                                ;; TODO Impl Box 
-            (bb bb1 [(= _4 (use _1))] (call _3 <std::boxed::Box<T>>::into_raw ((use _4)) bb5 bb4))
-            (bb bb2 [] resume)
-            (bb bb3 [] (drop _1 bb2))
-            (bb bb4 [] (drop _4 bb3))
-            (bb bb5 [] (drop _4 bb6 bb3))
-            (bb bb6 [(= _6 (use _3))] (call _5 <std::boxed::Box<T>>::from_raw ((use _6)) bb7 bb3))
-            (bb bb7 [(= _0 unit)] (drop _5 bb8 bb3))
-            (bb bb8 [] (drop _1 bb9))
-            (bb bb9 [] return))))
+            (bb 1 [(= _4 (use _1))] (call _3 <std::boxed::Box<T>>::into_raw ((use _4)) 5 4))
+            (bb 2 [] resume)
+            (bb 3 [] (drop _1 2))
+            (bb 4 [] (drop _4 3))
+            (bb 5 [] (drop _4 6 3))
+            (bb 6 [(= _6 (use _3))] (call _5 <std::boxed::Box<T>>::from_raw ((use _6)) 7 3))
+            (bb 7 [(= _0 unit)] (drop _5 8 3))
+            (bb 8 [] (drop _1 9))
+            (bb 9 [] return))))
 
 (check-not-false (redex-match mir fn box-fun))
 
@@ -842,27 +842,27 @@
             (mut _5 : (& imm int))
             (mut _6 : (& imm int))
             (mut _7 : int)
-            (-> promoted0 () (& imm int)
+            (promoted 0 () (& imm int)
                 (mut _0 : (& imm int))
                 (mut _1 : int)
-                (bb bb0 [(= _1 12) (= _0 (& unique _1))] return))
-            (-> promoted1 () (& imm bool)
+                (bb 0 [(= _1 12) (= _0 (& unique _1))] return))
+            (promoted 1 () (& imm bool)
                 (mut _0 : (& imm bool))
                 (mut _1 : bool)
-                (bb bb0 [(= _1 #true) (= _0 (& unique _1))] return))
-            (bb bb0 [(= _3 promoted1)
+                (bb 0 [(= _1 #true) (= _0 (& unique _1))] return))
+            (bb 0 [(= _3 promoted1) ;; FIXME 
                      (= _2 (& unique (* _3)))
                      (= _6 promoted0)
                      (= _5 (& unique (* _6)))]
-                (call _1 are_positive_hashes ((use _2) (use _5)) bb1))
-            (bb bb1 [(= _0 unit)] return))))
+                (call _1 are_positive_hashes ((use _2) (use _5)) 1))
+            (bb 1 [(= _0 unit)] return))))
 
 (define impl_hash_for_i64
   (term (-> impl_hash_for_i64 ((_1 : (& imm int))) uint
             (mut _0 : uint)
-            (scope scope1 (_2 : (& imm int)))
+            (scope 1 (_2 : (& imm int)))
             (mut _3 :  int)
-            (bb bb0 [(= _2 (use _1))
+            (bb 0 [(= _2 (use _1))
                      (= _3 (use (* _2)))
                      (= _0 (cast misc _3 as uint))]
                 return))))
@@ -870,44 +870,44 @@
 (define impl_hash_for_bool
   (term (-> impl_hash_for_bool ((_1 : (& imm bool))) uint
             (mut _0 : uint)
-            (scope scope1 (_2 : (& imm bool)))
+            (scope 1 (_2 : (& imm bool)))
             (_3 : bool)
-            (bb bb0 [(= _2 (use _1))
+            (bb 0 [(= _2 (use _1))
                      (= _3 (use (* _2)))]
-                     (switchInt _3 (0 bb2) (otherwise bb1)))
-            (bb bb1 [(= _0 0)] (goto bb3))
-            (bb bb2 [(= _0 1)] (goto bb3))
-            (bb bb3 [] return))))
+                     (switchInt _3 (0 2) (otherwise 1)))
+            (bb 1 [(= _0 0)] (goto 3))
+            (bb 2 [(= _0 1)] (goto 3))
+            (bb 3 [] return))))
 
 (define is_positive_hash
   (term (-> is_positive_hash ((_1 : (& imm T))) bool
             (mut _0 : bool)
-            (scope scope1 (_2 : (& imm T)))
+            (scope 1 (_2 : (& imm T)))
             (mut _3 : uint)
             (mut _4 : (& imm T))
-            (bb bb0 [(= _2 (use _1))
+            (bb 0 [(= _2 (use _1))
                      (= _4 (& unique (* _2)))]
-                (call _3 Hash::hash ((use _4)) bb1))
-            (bb bb1 [(= _0 (> (use _3) 0))] return))))
+                (call _3 Hash::hash ((use _4)) 1))
+            (bb 1 [(= _0 (> (use _3) 0))] return))))
 
 (define are_positive_hashes
   (term (-> are_positive_hashes ((_1 : (& imm T)) (_2 : (& imm U))) bool
             (mut _0 : bool)
-            (scope scope1 (_3 : (& imm T)) (_4 : (& imm U)))
+            (scope 1 (_3 : (& imm T)) (_4 : (& imm U)))
             (mut _5 : bool)
             (mut _6 : (& imm T))
             (mut _7 : bool)
             (mut _8 : (& imm U))
-            (bb bb0 [(= _3 (use _1))
+            (bb 0 [(= _3 (use _1))
                      (= _4 (use _2))
                      (= _6 (& unique (* _3)))]
-                (call _5 is_positive_hash ((use _6)) bb5))
-            (bb bb1 [(= _0 #true)] (goto bb4))
-            (bb bb2 [(= _0 #false)] (goto bb4))
-            (bb bb3 [(= _8 (& unique (* _4)))] (call _7 is_positive_hash ((use _8)) bb6))
-            (bb bb4 [] return)
-            (bb bb5 [] (switchInt _5 (0 bb2) (otherwise bb3)))
-            (bb bb6 [] (switchInt _7 (0 bb2) (otherwise bb1))))))
+                (call _5 is_positive_hash ((use _6)) 5))
+            (bb 1 [(= _0 #true)] (goto 4))
+            (bb 2 [(= _0 #false)] (goto 4))
+            (bb 3 [(= _8 (& unique (* _4)))] (call _7 is_positive_hash ((use _8)) 6))
+            (bb 4 [] return)
+            (bb 5 [] (switchInt _5 (0 2) (otherwise 3)))
+            (bb 6 [] (switchInt _7 (0 2) (otherwise 1))))))
 
 (check-not-false (redex-match mir fn main))
 (check-not-false (redex-match mir fn impl_hash_for_i64))
