@@ -2,6 +2,10 @@
 (require redex)
 (provide (all-defined-out))
 
+;; A Redex model for the intermediate representation (MIR) inside the
+;; Rust compiler.
+;; Based on https://github.com/rust-lang/rust/blob/master/src/librustc/mir/mod.rs
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
 ;; Grammar
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
@@ -17,9 +21,11 @@
   ;;    g: function name
   ;;    vdecls: parameters
   ;;    ty: return type
-  ;;    decl ...: list of variable declarations and local scopes 
+  ;;    decl ...: list of variable declarations and local scopes
+  ;;    promoted ...: list of rvalues promoted from this fn
+  ;;                  (fn of a constant, i.e. with a separate set of local decls than this fn) 
   ;;    blk ...: list of basic blocks
-  (fn (-> g vdecls ty decl ... blk ...))
+  (fn (-> g vdecls ty decl ... promoted ... blk ...))
   
   ;; declaration
   ;;    vdecl: single variable declaration
@@ -40,6 +46,9 @@
   ;;    vdecls: list of (local) variable declarations
   ;;    scps: list of (nested) scopes 
   (scp (scope l decl ...))
+
+  ;; promoted rvalues, which is like a separate function 
+  (promoted fn)
   
   ;; basic block
   ;;    l: label
@@ -87,13 +96,16 @@
       ;; FIXME: is this the right information to keep in the box? 
       ;;        https://doc.rust-lang.org/src/alloc/boxed.rs.html#108
       (box rv)                          ;; pointer to heap-allocated val
-      (struct s sts))                   ;; structs, with name and body
+      (struct s sts)                    ;; structs, with name and body
+      variable-not-otherwise-mentioned) ;; FIXME: temp hack to allow promoted rvalues here.
+                                        ;; This should be a proper index into the promoted list. 
   
   ;; A subset of rvalues that can be used inside other rvalues 
   (operand (use lv)
            const)
   
-  ;; A subset of rvalues that can be evaluated at compile time 
+  ;; A subset of rvalues that can be evaluated at compile time
+  ;; http://manishearth.github.io/rust-internals-docs/rustc_typeck/middle/const_val/enum.ConstVal.html
   (const boolean
          number
          unit)                          ;; unit values
@@ -124,8 +136,7 @@
       (& mq ty)                         ;; reference types with qualifiers
       (* mq ty)                         ;; raw pointer types with qualifiers
       (box ty)                          ;; box 
-      ;; FIXME: multiple generic types https://doc.rust-lang.org/book/generics.html
-      T)                                ;; generic            
+      T)                                ;; generic (but Sized) type            
   
   ;; error messages
   (msg string)
@@ -137,7 +148,8 @@
   (f integer)                           ;; field "names"
   (g variable-not-otherwise-mentioned)  ;; function names
   (l variable-not-otherwise-mentioned)  ;; labels (i.e. basic block names)
-  (s variable-not-otherwise-mentioned)) ;; struct names
+  (s variable-not-otherwise-mentioned)  ;; struct names
+  (T variable-not-otherwise-mentioned)) ;; generic type names 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluation
@@ -287,7 +299,7 @@
   [(sizeof bool) 1]
   [(sizeof ()) 0] ; base case for aggregate types 
   [(sizeof (ty_1 ty_2 ...)) ,(+ (term (sizeof ty_1)) (term (sizeof (ty_2 ...))))]
-  [(sizeof (vec ty cap)) ,(* (term (sizeof ty)) (term cap))]
+  [(sizeof (vec ty cap)) ,(* (term (sizeof ty)) (term cap))] ;; FIXME maybe we should be explicit about this -- 
   [(sizeof (& mq ty)) 1] ; reference
   [(sizeof (* mq ty)) 1] ; pointer
   [(sizeof (box ty)) 1] ; FIXME pointer? -- or do we need size of box contents? 
