@@ -77,8 +77,9 @@
   ;; A subset of rvalues that can be evaluated at compile time
   ;; http://manishearth.github.io/rust-internals-docs/rustc_typeck/middle/const_val/enum.ConstVal.html
   (const boolean
-         (number numtype)
+         (n numtype)
          unit)                                    ;; unit values
+  (n number)
 
   ;; binary operation kinds
   (binop + - * / % ^ & \| << >> == < <= != >= >)
@@ -103,3 +104,68 @@
   (x variable-not-otherwise-mentioned)            ;; variables 
   (f integer)                                     ;; field "names"
   (g variable-not-otherwise-mentioned))           ;; function names
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Evaluation
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-extended-language mir-machine mir
+  ;; Evaluation contexts
+  (E hole
+     (binop E rv)
+     (binop const E)
+     (unop E)))
+
+(define run
+  (reduction-relation
+   mir-machine
+   (--> (in-hole E (binop const_1 const_2))
+        (in-hole E (eval-binop binop const_1 const_2))
+        "binop")
+   (--> (in-hole E (unop const))
+        (in-hole E (eval-unop unop const))
+        "unop")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Metafunctions 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-metafunction mir-machine
+  ;; TODO: Non-numeric operands
+  ;; i.e. http://manishearth.github.io/rust-internals-docs///rustc/middle/const_val/enum.ConstVal.html?
+  eval-binop : binop const const -> const
+  [(eval-binop binop const_1 const_2)
+   ((eval-binop-helper binop n_1 n_2) numtype_1)
+   (where n_1 ,(car (term const_1)))
+   (where n_2 ,(car (term const_2)))
+   (where numtype_1 ,(cadr (term const_1)))])
+
+(define-metafunction mir-machine
+  eval-binop-helper : binop n n -> n  
+  [(eval-binop-helper + n_1 n_2) ,(+ (term n_1) (term n_2))] 
+  [(eval-binop-helper - n_1 n_2) ,(- (term n_1) (term n_2))]
+  [(eval-binop-helper * n_1 n_2) ,(* (term n_1) (term n_2))]
+  [(eval-binop-helper / n_1 n_2) ,(/ (term n_1) (term n_2))]
+  [(eval-binop-helper ^ n_1 n_2) ,(bitwise-xor (term n_1) (term n_2))]
+  [(eval-binop-helper & n_1 n_2) ,(bitwise-and (term n_1) (term n_2))]
+  [(eval-binop-helper \| n_1 n_2) ,(bitwise-ior (term n_1) (term n_2))]
+  [(eval-binop-helper << n_1 n_2) ,(arithmetic-shift (term n_1) (term n_2))]
+  [(eval-binop-helper >> n_1 n_2) ,(arithmetic-shift (term n_1) (term (eval-unop - n_2)))]
+  [(eval-binop-helper < n_1 n_2) ,(< (term n_1) (term n_2))]
+  [(eval-binop-helper <= n_1 n_2) ,(<= (term n_1) (term n_2))]
+  [(eval-binop-helper != n_1 n_2) ,(not (term (eval-binop == n_1 n_2)))]
+  [(eval-binop-helper == n_1 n_2) ,(= (term n_1) (term n_2))]
+  [(eval-binop-helper > n_1 n_2) ,(> (term n_1) (term n_2))]
+  [(eval-binop-helper >= n_1 n_2) ,(>= (term n_1) (term n_2))]
+  [(eval-binop-helper % n_1 n_2) ,(remainder (term n_1) (term n_2))])
+
+(define-metafunction mir-machine
+  eval-unop : unop const -> const
+  [(eval-unop unop (n_1 numtype_1))
+   ((eval-unop-helper unop n_1) numtype_1)]
+  [(eval-unop unop boolean) (eval-unop-helper unop boolean)])
+
+(define-metafunction mir-machine
+  eval-unop-helper : unop any -> any
+  [(eval-unop-helper ! any) ,(not (term any))]
+  [(eval-unop-helper - any) ,(- (term any))])
