@@ -20,7 +20,7 @@
   ;;     fns: list of functions
   ;;     call: i.e. main, the entrance function call into the program
   (prog fns call)
-
+  
   ;; functions
   (fns [fn ...])
   ;; function
@@ -30,13 +30,13 @@
   ;;     bbs: basic blocks 
   ;;     idx: the basic block to run first 
   (fn (g (x_!_ ...) bbs idx))
-
+  
   ;; variables with their assignments 
   (vars (let-vars ([= lv_!_ rv] ...)))
-
+  
   ;; basic blocks, with a unique integer identifier, local variables and a terminator
   (bbs (let-bbs([bb idx_!_ vars terminator] ...)))
-
+  
   ;; terminator
   (terminator return                              ;; return to caller
               resume                              ;; emitted by diverge call during unwinding 
@@ -54,12 +54,12 @@
               (goto idx)                          ;; goto l
               (drop lv idx)                       ;; drop lv, goto l 
               (drop lv idx idx))                  ;; as above, with extra unwinding label
-
+  
   ;; lvalues
   (lv x
       (· lv f)                                    ;; projection (e.g. tuple access)
       (* lv))                                     ;; pointer deref
-
+  
   ;; rvalue
   (rvs (rv ...))
   (rv (use lv)                                    ;; use lv  
@@ -70,21 +70,23 @@
       (cast castkind lv as ty)                    ;; typecasts
       (operand ...)                               ;; aggregate types i.e. tuples   
       (struct s ([= lv_!_ rv] ...)))              ;; structs ;; FIXME reconsider rvs? 
-      ;; TODO: handle remaining rvalues 
-
+  ;; TODO: handle remaining rvalues 
+  
   ;; A subset of rvalues that can be used inside other rvalues 
   (operand (use lv)
            const)
-
+  
   ;; A subset of rvalues that can be evaluated at compile time
   ;; http://manishearth.github.io/rust-internals-docs/rustc_typeck/middle/const_val/enum.ConstVal.html
   (const boolean
-         (n numtype)
+         typed-num
          unit)                                    ;; unit values
+  (typed-num (n numtype))
   (n number)
-
+  
   ;; binary operation kinds
-  (binop + - * / % ^ & \| << >> == < <= != >= >)
+  (binop + - * / % ^ & \| << >> comp-binop)
+  (comp-binop == < <= != >= >)
   
   ;; unary operation kinds
   (unop ! -)
@@ -95,16 +97,16 @@
             closurefp                             ;; ClosureFnPointer 
             unsafefp                              ;; UnsafeFnPointer
             unsize)                               ;; Unsize
-
+  
   ;; error messages i.e. for asserts
   (msg string)
-
+  
   ;; types of numbers
   (numtype i32 i64 u8 u32 u64)
   
   ;; borrow kinds
   (borrowkind shared unique mut)
-
+  
   (idx integer)                                   ;; indices 
   (x variable-not-otherwise-mentioned)            ;; variables 
   (f integer)                                     ;; field "names"
@@ -117,8 +119,25 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-extended-language mir-machine mir
+  ;; Variable environment, vars mapped to their store addresses 
+  (ρ (env (x α) ...))
+  ;; addresses
+  (α variable-not-otherwise-mentioned)
+  ;; the store, addresses mapped to variables 
+  (σ (store (α v) ...))
+  ;; store values 
+  (v α                                 ;; pointer
+     typed-num                         ;; numerical value
+     void)                             ;; void (uninitialized)
   ;; Evaluation contexts
   (E hole
+     ;; single function
+     (E σ ρ)
+     ;; lvalues 
+     (* E)
+     (· E f)
+     ;; rvalues
+     (use E)
      (binop E rv)
      (binop const E)
      (unop E)))
@@ -126,11 +145,14 @@
 (define run
   (reduction-relation
    mir-machine
-   (--> (in-hole E (binop const_1 const_2))
-        (in-hole E (eval-binop binop const_1 const_2))
+   (--> ((in-hole E (use x_0)) σ ρ) 
+        ((in-hole E (deref σ ρ x_0)) σ ρ)
+        "use")
+   (--> ((in-hole E (binop const_1 const_2)) σ ρ)
+        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ)
         "binop")
-   (--> (in-hole E (unop const))
-        (in-hole E (eval-unop unop const))
+   (--> ((in-hole E (unop const)) σ ρ)
+        ((in-hole E (eval-unop unop const)) σ ρ)
         "unop")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -138,10 +160,32 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-metafunction mir-machine
+  ;; Returns the value mapped to this variable in the store 
+  deref : σ ρ x -> v
+  [(deref σ ρ x) (store-lookup σ α)
+                 (where α (env-lookup ρ x))])
+
+(define-metafunction mir-machine
+  ;; Returns the value mapped to the address α in the store 
+  store-lookup : σ α -> v
+  [(store-lookup (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0) v_0]
+  [(store-lookup (store (α_1 v_1) ...) α) ,(error "store-lookup: address not found in store:" (term α))])
+
+(define-metafunction mir-machine
+  ;; Returns the address mapped to the variable x in the env 
+  env-lookup : ρ x -> α
+  [(env-lookup (env (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...) x_0) α_0]
+  [(env-lookup (env (x_1 α_1) ...) x) ,(error "env-lookup: variable not found in environment:" (term x))])
+
+(define-metafunction mir-machine
   ;; TODO: Non-numeric operands
   ;; i.e. http://manishearth.github.io/rust-internals-docs///rustc/middle/const_val/enum.ConstVal.html?
   ;; TODO: Handle checked operations, see test-lang#225
   eval-binop : binop const const -> const
+  [(eval-binop comp-binop const_1 const_2)
+   (eval-comp-binop-helper comp-binop n_1 n_2)
+   (where n_1 ,(car (term const_1)))
+   (where n_2 ,(car (term const_2)))]
   [(eval-binop binop const_1 const_2)
    ((eval-binop-helper binop n_1 n_2) numtype_1)
    (where n_1 ,(car (term const_1)))
@@ -149,7 +193,7 @@
    (where numtype_1 ,(cadr (term const_1)))])
 
 (define-metafunction mir-machine
-  eval-binop-helper : binop n n -> n  
+  eval-binop-helper : binop n n -> any
   [(eval-binop-helper + n_1 n_2) ,(+ (term n_1) (term n_2))] 
   [(eval-binop-helper - n_1 n_2) ,(- (term n_1) (term n_2))]
   [(eval-binop-helper * n_1 n_2) ,(* (term n_1) (term n_2))]
@@ -159,13 +203,16 @@
   [(eval-binop-helper \| n_1 n_2) ,(bitwise-ior (term n_1) (term n_2))]
   [(eval-binop-helper << n_1 n_2) ,(arithmetic-shift (term n_1) (term n_2))]
   [(eval-binop-helper >> n_1 n_2) ,(arithmetic-shift (term n_1) (term (eval-unop - n_2)))]
-  [(eval-binop-helper < n_1 n_2) ,(< (term n_1) (term n_2))]
-  [(eval-binop-helper <= n_1 n_2) ,(<= (term n_1) (term n_2))]
-  [(eval-binop-helper != n_1 n_2) ,(not (term (eval-binop == n_1 n_2)))]
-  [(eval-binop-helper == n_1 n_2) ,(= (term n_1) (term n_2))]
-  [(eval-binop-helper > n_1 n_2) ,(> (term n_1) (term n_2))]
-  [(eval-binop-helper >= n_1 n_2) ,(>= (term n_1) (term n_2))]
   [(eval-binop-helper % n_1 n_2) ,(remainder (term n_1) (term n_2))])
+
+(define-metafunction mir-machine
+  eval-comp-binop-helper : binop n n -> boolean
+  [(eval-comp-binop-helper < n_1 n_2) ,(< (term n_1) (term n_2))]
+  [(eval-comp-binop-helper <= n_1 n_2) ,(<= (term n_1) (term n_2))]
+  [(eval-comp-binop-helper != n_1 n_2) ,(not (term (eval-binop == n_1 n_2)))]
+  [(eval-comp-binop-helper == n_1 n_2) ,(= (term n_1) (term n_2))]
+  [(eval-comp-binop-helper > n_1 n_2) ,(> (term n_1) (term n_2))]
+  [(eval-comp-binop-helper >= n_1 n_2) ,(>= (term n_1) (term n_2))])
 
 (define-metafunction mir-machine
   eval-unop : unop const -> const
