@@ -43,11 +43,11 @@
               (switchInt lv                       ;; switch on an integer, branching to bb l 
                          (const idx) ...
                          (otherwise idx))
-              (assert rv idx msg)                 ;; checked branch
+              (assert operand boolean idx msg)    ;; checked branch
               ;;    rv: condition
               ;;    idx: index of block to branch to, if rv evals to true
               ;;    msg: error message, if rv evals to false
-              (assert rv idx idx msg)             ;; as above, with extra unwinding label 
+              (assert operand boolean idx idx msg);; as above, with extra unwinding label 
               ;; TODO: Consider removing: calls are just an assignment + a goto. 
               (call lv g rvs idx)                 ;; lv gets the result of calling g(rvs), branch to l on return  
               (call lv g rvs idx idx)             ;; as above, with extra unwinding label  
@@ -67,7 +67,9 @@
       const                                       ;; constants
       (binop operand operand)                     ;; binary operations 
       (unop operand)                              ;; unary operations
-      (cast castkind lv as ty))                   ;; typecasts
+      (cast castkind lv as ty)                    ;; typecasts
+      (operand ...)                               ;; aggregate types i.e. tuples   
+      (struct s ([= lv_!_ rv] ...)))              ;; structs ;; FIXME reconsider rvs? 
       ;; TODO: handle remaining rvalues 
 
   ;; A subset of rvalues that can be used inside other rvalues 
@@ -94,6 +96,9 @@
             unsafefp                              ;; UnsafeFnPointer
             unsize)                               ;; Unsize
 
+  ;; error messages i.e. for asserts
+  (msg string)
+
   ;; types of numbers
   (numtype i32 i64 u8 u32 u64)
   
@@ -103,7 +108,9 @@
   (idx integer)                                   ;; indices 
   (x variable-not-otherwise-mentioned)            ;; variables 
   (f integer)                                     ;; field "names"
-  (g variable-not-otherwise-mentioned))           ;; function names
+  (g variable-not-otherwise-mentioned)            ;; function names
+  (s variable-not-otherwise-mentioned))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluation
@@ -133,6 +140,7 @@
 (define-metafunction mir-machine
   ;; TODO: Non-numeric operands
   ;; i.e. http://manishearth.github.io/rust-internals-docs///rustc/middle/const_val/enum.ConstVal.html?
+  ;; TODO: Handle checked operations, see test-lang#225
   eval-binop : binop const const -> const
   [(eval-binop binop const_1 const_2)
    ((eval-binop-helper binop n_1 n_2) numtype_1)
