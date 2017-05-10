@@ -54,7 +54,7 @@
                                [,a2 (1 i32)] ; *x
                                [,a3 void])
                         ,ENV0)))
-  #;(test-->> run (term ((let-vars ([= a (1 i32)] ; run multiple statements
+  (test-->> run (term ((let-vars ([= a (1 i32)] ; run multiple statements
                                   [= (* x) (2 i32)]))
                        ,STORE0 ,ENV0))
             (term (void (store [,a0 (1 i32)]

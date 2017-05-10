@@ -125,6 +125,14 @@
   (α (ptr variable-not-otherwise-mentioned))
   ;; the store, addresses mapped to variables 
   (σ (store (α v) ...))
+  ;;
+  ;; the stack frame, local variables mapped to frame values 
+  (frame (frm (x frm-v) ...))
+  ;; frame values
+  (frm-v v                             ;; heap addresses, nums, void 
+         (x ...))                      ;; aggregate values like tuples, vecs.
+                                       ;;     this is a pointer to each of the
+                                       ;;     contents in the aggregate data structure 
   ;; store values 
   (v α                                 ;; pointer
      typed-num                         ;; numerical value
@@ -134,7 +142,8 @@
      ;; single function
      (E σ ρ)
      ;; variable statements
-     (let-vars (void ... E (= lv rv) ...))
+     (let-vars E)
+     (void ... E (= lv rv) ...)
      (= E rv)
      (= x E)
      (= α E)
@@ -150,19 +159,9 @@
 (define run
   (reduction-relation
    mir-machine
-   ;; functions
-   (--> ((in-hole E (g (x ...)
-                       (let-bbs ([bb idx_1 vars_1 terminator_1]...
-                                 [bb idx_start vars_start terminator_start]
-                                 [bb idx_2 vars_2 terminator_2] ...))
-                       idx_start)) σ ρ)
-        (g (x ...)
-           (let-bbs ([bb idx_1 vars_1 terminator_1]...
-                     [bb idx_start vars_start terminator_start]
-                     [bb idx_2 vars_2 terminator_2] ...))
-           (in-hole E ((bb idx_start vars_start terminator_start) σ ρ)))) 
-   
    ;; Variable assignments
+   (--> ((in-hole E (let-vars (void ...))) σ ρ)
+        ((in-hole E void) σ ρ))
    (--> ((in-hole E (= x v)) σ ρ)
         ((in-hole E void) (store-update σ ρ x v) ρ)
         "store-update-var")
@@ -190,7 +189,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Metafunctions 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (define-metafunction mir-machine
   ;; Returns the value mapped to this variable in the store 
   deref : σ ρ x -> v
