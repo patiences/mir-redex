@@ -122,7 +122,7 @@
   ;; Variable environment, vars mapped to their store addresses 
   (ρ (env (x α) ...))
   ;; addresses
-  (α variable-not-otherwise-mentioned)
+  (α (ptr variable-not-otherwise-mentioned))
   ;; the store, addresses mapped to variables 
   (σ (store (α v) ...))
   ;; store values 
@@ -133,9 +133,14 @@
   (E hole
      ;; single function
      (E σ ρ)
+     ;; variable statements
+     (let-vars (void ... E (= lv rv) ...))
+     (= E rv)
+     (= x E)
+     (= α E)
      ;; lvalues 
      (* E)
-     (· E f)
+     ;; TODO: projection 
      ;; rvalues
      (use E)
      (binop E rv)
@@ -145,9 +150,36 @@
 (define run
   (reduction-relation
    mir-machine
+   ;; functions
+   (--> ((in-hole E (g (x ...)
+                       (let-bbs ([bb idx_1 vars_1 terminator_1]...
+                                 [bb idx_start vars_start terminator_start]
+                                 [bb idx_2 vars_2 terminator_2] ...))
+                       idx_start)) σ ρ)
+        (g (x ...)
+           (let-bbs ([bb idx_1 vars_1 terminator_1]...
+                     [bb idx_start vars_start terminator_start]
+                     [bb idx_2 vars_2 terminator_2] ...))
+           (in-hole E ((bb idx_start vars_start terminator_start) σ ρ)))) 
+   
+   ;; Variable assignments
+   (--> ((in-hole E (= x v)) σ ρ)
+        ((in-hole E void) (store-update σ ρ x v) ρ)
+        "store-update-var")
+   (--> ((in-hole E (= α v)) σ ρ)
+        ((in-hole E void) (store-update-direct σ α v) ρ)
+        "store-update-direct")
+   ;; Lvalues 
+   (--> ((in-hole E (* x)) σ ρ)
+        ((in-hole E (deref σ ρ x)) σ ρ)
+        "deref")
+   ;; Rvalues 
    (--> ((in-hole E (use x_0)) σ ρ) 
         ((in-hole E (deref σ ρ x_0)) σ ρ)
         "use")
+   (--> ((in-hole E (& borrowkind x_0)) σ ρ) 
+        ((in-hole E (env-lookup ρ x_0)) σ ρ)
+        "ref")
    (--> ((in-hole E (binop const_1 const_2)) σ ρ)
         ((in-hole E (eval-binop binop const_1 const_2)) σ ρ)
         "binop")
@@ -170,6 +202,21 @@
   store-lookup : σ α -> v
   [(store-lookup (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0) v_0]
   [(store-lookup (store (α_1 v_1) ...) α) ,(error "store-lookup: address not found in store:" (term α))])
+
+(define-metafunction mir-machine
+  ;; Updates the value mapped to this variable in the heap
+  store-update : σ ρ x v -> σ
+  [(store-update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
+   (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
+   (where α_0 (env-lookup ρ x_0))]
+  [(store-update (store (α_1 v_1) ...) ρ x v) ,(error "store-update: address not found in store:" (term x))])
+
+(define-metafunction mir-machine
+  ;; Updates the value at the address in the store
+  store-update-direct : σ α v -> σ
+  [(store-update-direct (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
+   (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)]
+  [(store-update-direct (store (α_1 v_1) ...) α v) ,(error "store-update-direct: address not found in store:" (term α))])
 
 (define-metafunction mir-machine
   ;; Returns the address mapped to the variable x in the env 
