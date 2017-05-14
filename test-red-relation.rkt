@@ -26,6 +26,9 @@
                             [,a3 void])))
 (check-not-false (redex-match mir-machine σ STORE0))
 
+(define MT-FRM (term (frm)))
+(check-not-false (redex-match mir-machine frame MT-FRM))
+
 ;; Reduction tests
 ;; =========================================================
 (define (function-eval-tests)
@@ -34,60 +37,60 @@
 (function-eval-tests)
 
 (define (statement-eval-tests)
-  (test-->> run (term ((= a (1 i32)) ,STORE0 ,ENV0))
+  (test-->> run (term ((= a (1 i32)) ,STORE0 ,ENV0 ,MT-FRM))
             (term (void (store [,a0 (1 i32)]
                                [,a1 ,a2]
                                [,a2 (5 i32)]
                                [,a3 void])
-                        ,ENV0)))
-  (test-->> run (term ((= a (+ (1 i32) (1 i32))) ,STORE0 ,ENV0))
+                        ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((= a (+ (1 i32) (1 i32))) ,STORE0 ,ENV0 ,MT-FRM))
             (term (void (store [,a0 (2 i32)]
                                [,a1 ,a2]
                                [,a2 (5 i32)]
                                [,a3 void])
-                        ,ENV0)))
-  (test-->> run (term ((* x) ,STORE0 ,ENV0))
-            (term (,a2 ,STORE0 ,ENV0)))
-  (test-->> run (term ((= (* x) (1 i32)) ,STORE0 ,ENV0)) ; *x = 1 
+                        ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((* x) ,STORE0 ,ENV0 ,MT-FRM))
+            (term (,a2 ,STORE0 ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((= (* x) (1 i32)) ,STORE0 ,ENV0 ,MT-FRM)) ; *x = 1 
             (term (void (store [,a0 void]
                                [,a1 ,a2]
                                [,a2 (1 i32)] ; *x
                                [,a3 void])
-                        ,ENV0)))
+                        ,ENV0 ,MT-FRM)))
   (test-->> run (term ((let-vars ([= a (1 i32)] ; run multiple statements
                                   [= (* x) (2 i32)]))
-                       ,STORE0 ,ENV0))
+                       ,STORE0 ,ENV0 ,MT-FRM))
             (term (void (store [,a0 (1 i32)]
                                [,a1 ,a2]
                                [,a2 (2 i32)] ; *x
                                [,a3 void])
-                        ,ENV0)))
+                        ,ENV0 ,MT-FRM)))
   (test-results))
 
 (statement-eval-tests)
 
 (define (rv-eval-tests)
-  (test-->> run (term ((use y) ,STORE0 ,ENV0))
-            (term ((5 i32) ,STORE0 ,ENV0)))
-  (test-->> run (term ((use z) ,STORE0 ,ENV0))
-            (term (void ,STORE0 ,ENV0)))
-  (test-->> run (term ((& mut x) ,STORE0 ,ENV0))
-            (term (,a1 ,STORE0 ,ENV0)))
-  (test-->> run (term ((+ (1 i32) (2 i32)) ,STORE0 ,ENV0)) (term ((3 i32) ,STORE0 ,ENV0)))
-  (test-->> run (term ((- (4 i32) (-20 i32)) ,STORE0 ,ENV0)) (term ((24 i32) ,STORE0 ,ENV0)))
-  (test-->> run (term ((* (5 i32) (6 i32)) ,STORE0 ,ENV0)) (term ((30 i32) ,STORE0 ,ENV0)))
-  (test-->> run (term ((< (1 i32) (2 i32)) ,STORE0 ,ENV0)) (term (#t ,STORE0 ,ENV0)))
-  (test-->> run (term ((% (-10 i32) (3 i32)) ,STORE0 ,ENV0)) (term ((-1 i32) ,STORE0 ,ENV0)))
-  (test--> run (term ((! #t) ,STORE0 ,ENV0)) (term (#f ,STORE0 ,ENV0)))
+  (test-->> run (term ((use y) ,STORE0 ,ENV0 ,MT-FRM))
+            (term ((5 i32) ,STORE0 ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((use z) ,STORE0 ,ENV0 ,MT-FRM))
+            (term (void ,STORE0 ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((& mut x) ,STORE0 ,ENV0 ,MT-FRM))
+            (term (,a1 ,STORE0 ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((+ (1 i32) (2 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term ((3 i32) ,STORE0 ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((- (4 i32) (-20 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term ((24 i32) ,STORE0 ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((* (5 i32) (6 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term ((30 i32) ,STORE0 ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((< (1 i32) (2 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term (#t ,STORE0 ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((% (-10 i32) (3 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term ((-1 i32) ,STORE0 ,ENV0 ,MT-FRM)))
+  (test--> run (term ((! #t) ,STORE0 ,ENV0 ,MT-FRM)) (term (#f ,STORE0 ,ENV0 ,MT-FRM)))
   (test-->> run
-            (term ((+ (use y) (1 i32)) ,STORE0 ,ENV0)) ; y + 1
-            (term ((6 i32) ,STORE0 ,ENV0)))
+            (term ((+ (use y) (1 i32)) ,STORE0 ,ENV0 ,MT-FRM)) ; y + 1
+            (term ((6 i32) ,STORE0 ,ENV0 ,MT-FRM)))
   (test-->> run
-            (term ((+ (1 i32) (use y)) ,STORE0 ,ENV0)) ; 1 + y
-            (term ((6 i32) ,STORE0 ,ENV0)))
+            (term ((+ (1 i32) (use y)) ,STORE0 ,ENV0 ,MT-FRM)) ; 1 + y
+            (term ((6 i32) ,STORE0 ,ENV0 ,MT-FRM)))
   (test-->> run
-            (term ((+ (use y) (use y)) ,STORE0 ,ENV0))
-            (term ((10 i32) ,STORE0 ,ENV0)))
+            (term ((+ (use y) (use y)) ,STORE0 ,ENV0 ,MT-FRM))
+            (term ((10 i32) ,STORE0 ,ENV0 ,MT-FRM)))
   (test-results))
 
 (rv-eval-tests)

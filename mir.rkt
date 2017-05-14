@@ -125,7 +125,6 @@
   (α (ptr variable-not-otherwise-mentioned))
   ;; the store, addresses mapped to variables 
   (σ (store (α v) ...))
-  ;;
   ;; the stack frame, local variables mapped to frame values 
   (frame (frm (x frm-v) ...))
   ;; frame values
@@ -140,7 +139,7 @@
   ;; Evaluation contexts
   (E hole
      ;; single function
-     (E σ ρ)
+     (E σ ρ frame)
      ;; variable statements
      (let-vars E)
      (void ... E (= lv rv) ...)
@@ -160,30 +159,30 @@
   (reduction-relation
    mir-machine
    ;; Variable assignments
-   (--> ((in-hole E (let-vars (void ...))) σ ρ)
-        ((in-hole E void) σ ρ))
-   (--> ((in-hole E (= x v)) σ ρ)
-        ((in-hole E void) (store-update σ ρ x v) ρ)
+   (--> ((in-hole E (let-vars (void ...))) σ ρ frame)
+        ((in-hole E void) σ ρ frame))
+   (--> ((in-hole E (= x v)) σ ρ frame)
+        ((in-hole E void) (store-update σ ρ x v) ρ frame)
         "store-update-var")
-   (--> ((in-hole E (= α v)) σ ρ)
-        ((in-hole E void) (store-update-direct σ α v) ρ)
+   (--> ((in-hole E (= α v)) σ ρ frame)
+        ((in-hole E void) (store-update-direct σ α v) ρ frame)
         "store-update-direct")
    ;; Lvalues 
-   (--> ((in-hole E (* x)) σ ρ)
-        ((in-hole E (deref σ ρ x)) σ ρ)
+   (--> ((in-hole E (* x)) σ ρ frame)
+        ((in-hole E (deref σ ρ x)) σ ρ frame)
         "deref")
    ;; Rvalues 
-   (--> ((in-hole E (use x_0)) σ ρ) 
-        ((in-hole E (deref σ ρ x_0)) σ ρ)
+   (--> ((in-hole E (use x_0)) σ ρ frame) 
+        ((in-hole E (deref σ ρ x_0)) σ ρ frame)
         "use")
-   (--> ((in-hole E (& borrowkind x_0)) σ ρ) 
-        ((in-hole E (env-lookup ρ x_0)) σ ρ)
+   (--> ((in-hole E (& borrowkind x_0)) σ ρ frame) 
+        ((in-hole E (env-lookup ρ x_0)) σ ρ frame)
         "ref")
-   (--> ((in-hole E (binop const_1 const_2)) σ ρ)
-        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ)
+   (--> ((in-hole E (binop const_1 const_2)) σ ρ frame)
+        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ frame)
         "binop")
-   (--> ((in-hole E (unop const)) σ ρ)
-        ((in-hole E (eval-unop unop const)) σ ρ)
+   (--> ((in-hole E (unop const)) σ ρ frame)
+        ((in-hole E (eval-unop unop const)) σ ρ frame)
         "unop")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
