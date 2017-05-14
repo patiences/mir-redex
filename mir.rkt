@@ -130,7 +130,7 @@
   (frame (frm (x frm-v) ...))
   ;; frame values
   (frm-v v                             ;; heap addresses, nums, void 
-         (x ...))                      ;; aggregate values like tuples, vecs.
+         (list x ...))                 ;; aggregate values like tuples, vecs.
                                        ;;     this is a pointer to each of the
                                        ;;     contents in the aggregate data structure 
   ;; store values 
@@ -140,7 +140,8 @@
   ;; Evaluation contexts
   (E hole
      ;; single function
-     (E σ ρ)
+     #;(E σ ρ)
+     (E σ ρ frame)
      ;; variable statements
      (let-vars E)
      (void ... E (= lv rv) ...)
@@ -159,37 +160,89 @@
 (define run
   (reduction-relation
    mir-machine
+   ;; functions
+   #; (--> ((in-hole E (g (x ...)
+                       (let-bbs ([bb idx_1 vars_1 terminator_1]...
+                                 [bb idx_start vars_start terminator_start]
+                                 [bb idx_2 vars_2 terminator_2] ...))
+                       idx_start)) σ ρ)
+        (g (x ...)
+           (let-bbs ([bb idx_1 vars_1 terminator_1]...
+                     [bb idx_start vars_start terminator_start]
+                     [bb idx_2 vars_2 terminator_2] ...))
+           (in-hole E ((bb idx_start vars_start terminator_start) σ ρ)))) 
+   
    ;; Variable assignments
-   (--> ((in-hole E (let-vars (void ...))) σ ρ)
+   (--> ((in-hole E (let-vars (void ...))) σ ρ frame)
         ((in-hole E void) σ ρ))
-   (--> ((in-hole E (= x v)) σ ρ)
-        ((in-hole E void) (store-update σ ρ x v) ρ)
+   
+   (--> ((in-hole E (= x frm-v)) σ ρ frame)                 ;; update the value of the local variable in the frame           
+        ((in-hole E void) σ ρ (update frame x frm-v))
         "store-update-var")
-   (--> ((in-hole E (= α v)) σ ρ)
-        ((in-hole E void) (store-update-direct σ α v) ρ)
+   
+   (--> ((in-hole E (= α v)) σ ρ)                           ;; update the value of the variable in memory 
+        ((in-hole E void) (store-update-direct σ α v) ρ frame)
         "store-update-direct")
+   
    ;; Lvalues 
-   (--> ((in-hole E (* x)) σ ρ)
-        ((in-hole E (deref σ ρ x)) σ ρ)
+   (--> ((in-hole E (* x)) σ ρ frame)
+        ((in-hole E (deref frame x)) σ ρ frame)
         "deref")
+   (-->((in-hole E (· x f)) σ ρ frame)
+       ((in-hole E (deref frame x.f)) σ ρ frame)
+       (where x.f (get-projection x f))
+       "projection")
    ;; Rvalues 
-   (--> ((in-hole E (use x_0)) σ ρ) 
-        ((in-hole E (deref σ ρ x_0)) σ ρ)
+   (--> ((in-hole E (use x_0)) σ ρ frame) 
+        ((in-hole E (lookup frame x_0)) σ ρ frame)
         "use")
-   (--> ((in-hole E (& borrowkind x_0)) σ ρ) 
-        ((in-hole E (env-lookup ρ x_0)) σ ρ)
+   (--> ((in-hole E (& borrowkind x_0)) σ ρ frame) 
+        ((in-hole E (env-lookup ρ x_0)) σ ρ frame)
         "ref")
-   (--> ((in-hole E (binop const_1 const_2)) σ ρ)
-        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ)
+   (--> ((in-hole E (binop const_1 const_2)) σ ρ frame)
+        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ frame)
         "binop")
-   (--> ((in-hole E (unop const)) σ ρ)
-        ((in-hole E (eval-unop unop const)) σ ρ)
+   (--> ((in-hole E (unop const)) σ ρ frame)
+        ((in-hole E (eval-unop unop const)) σ ρ frame)
         "unop")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Metafunctions 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define-metafunction mir-machine
+  ;; Returns the key pointer to the field inside the aggregate object 
+  get-projection : frame x f -> x
+  [(get-projection (frm (x_1 frm-v_1) ... (x_0 (list x ...)) (x_2 frm-v_2) ...) x_0 f)
+   ,(list-ref (term (list x ...)) (term f))]
+  [(get-projection (frm (x_1 frm-v_1) ... (x_0 frm-v_0) (x_2 frm-v_2) ...) x_0 f)
+   ,(error "get-projection: not an aggregate object:" (term x_0))]
+  [(get-projection (frm (x_1 frm-v_1) ...) x f)
+   ,(error "get-projection: variable not in frame:" (term x))])
+  
+(define-metafunction mir-machine
+ update : frame x frm-v -> frame
+  [(update (frm (x_1 frm-v_1) ... (x_0 frm-v_old) (x_2 frm-v_2) ...) x_0 frm-v_new)
+   (frm (x_1 frm-v_1) ... (x_0 frm-v_new) (x_2 frm-v_2) ...)]
+  [(update (frm (x_1 frm-v_1) ...) x frm-v_new)
+   ,(error "update: variable not found in frame:" (term x))])
+
+(define-metafunction mir-machine
+  ;; Lookup the value of the variable in the stack frame
+  lookup : frame x -> frm-v
+  [(lookup (frm (x_1 frm-v_1) ... (x_0 frm-v_0) (x_2 frm-v_2) ...) x_0) frm-v_0]
+  [(lookup frame x) ,(error "lookup: variable not found in frame:" (term x))])
+
+(define-metafunction mir-machine
+  ;; Returns the address mapped to this variable in the stack frame 
+  deref : frame x -> α
+  [(deref (frm (x_1 frm-v_1) ... (x_0 α_0) (x_2 frm-v_2) ...) x_0)
+   α_0]
+  [(deref (frm (x_1 frm-v_1) ... (x_0 frm-v_0) (x_2 frm-v_2) ...) x_0)
+   ,(error "deref: invalid dereference, not a pointer:" (term x_0))]
+  [(deref (frm (x_1 frm-v_1) ...) x) ,(error "deref: variable not found in frame:" (term x))])
+
+#;(define-metafunction mir-machine
   ;; Returns the value mapped to this variable in the store 
   deref : σ ρ x -> v
   [(deref σ ρ x) (store-lookup σ α)
