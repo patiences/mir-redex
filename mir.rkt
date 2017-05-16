@@ -113,7 +113,6 @@
   (g variable-not-otherwise-mentioned)            ;; function names
   (s variable-not-otherwise-mentioned))
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluation
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -148,7 +147,7 @@
      (= α E)
      ;; lvalues 
      (* E)
-     ;; TODO: projection 
+     (· E f)
      ;; rvalues
      (use E)
      (binop E rv)
@@ -171,6 +170,9 @@
    (--> ((in-hole E (* x)) σ ρ frame)
         ((in-hole E (deref σ frame x)) σ ρ frame)
         "deref")
+   (--> ((in-hole E (· x f)) σ ρ frame)
+        ((in-hole E (deref-projection σ frame x f)) σ ρ frame)
+        "deref-projection")
    ;; Rvalues 
    (--> ((in-hole E (use x_0)) σ ρ frame) 
         ((in-hole E (deref σ frame x_0)) σ ρ frame)
@@ -193,8 +195,23 @@
   deref : σ frame x -> v
   [(deref σ frame x) (store-lookup σ α)
                      (where α (frm-lookup frame x))]
-  ;; TODO handle aggregate values
+  ;; TODO handle dereferencing aggregate values
   )
+
+(define-metafunction mir-machine
+  ;; Dereferences a projected value
+  deref-projection : σ frame x f -> v
+  [(deref-projection σ frame x f) (store-lookup σ α_projected)                        
+                                  (where (x_0 ...) (frm-lookup frame x))
+                                  (where x_projected (list-ref (x_0 ...) f))
+                                  (where α_projected (frm-lookup frame x_projected))])
+
+(define-metafunction mir-machine
+  ;; Returns the ith element of a list with form like (frm (x_0 v_0) ...)
+  list-ref : any idx -> any
+  [(list-ref () idx) ,(error "list-ref: index not in range:" (term idx))]
+  [(list-ref (any_0 any_1 ...) 0) any_0]
+  [(list-ref (any_0 any_1 ...) idx) (list-ref (any_1 ...) ,(sub1 (term idx)))]) 
 
 (define-metafunction mir-machine
   ;; Returns the value mapped to the address α in the store 

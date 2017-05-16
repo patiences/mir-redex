@@ -26,7 +26,8 @@
                     (a ,a0)
                     (x ,a1)
                     (y ,a2)
-                    (z ,a3)]))
+                    (z ,a3)
+                    (xyz (x y z))]))
 (check-not-false (redex-match mir-machine frame MT-FRM))
 
 ;; Reduction tests
@@ -51,6 +52,8 @@
                         ,MT-ENV ,FRM0)))
   (test-->> run (term ((* x) ,STORE0 ,MT-ENV ,FRM0))
             (term (,a2 ,STORE0 ,MT-ENV ,FRM0)))
+  (test-->> run (term ((· xyz 1) ,STORE0 ,MT-ENV ,FRM0))
+            (term ((5 i32) ,STORE0 ,MT-ENV ,FRM0)))
   (test-->> run (term ((= (* x) (1 i32)) ,STORE0 ,MT-ENV ,FRM0)) ; *x = 1 
             (term (void (store [,a0 void]
                                [,a1 ,a2]
@@ -100,6 +103,7 @@
 ;; deref : σ ρ x -> v
 (test-equal (term (deref ,STORE0 ,FRM0 x)) (term ,a2))
 (test-equal (term (deref ,STORE0 ,FRM0 y)) (term (5 i32)))
+;(test-equal (term (deref ,STORE0 ,FRM0 xyz)) (term ,a2))
 
 ;; =========================================================
 ;; frm-lookup : frame x -> frm-v
@@ -111,5 +115,11 @@
 (check-exn exn:fail? (λ () (term (store-lookup (store) 1))) "store-lookup: address not found in store: 1")
 (check-exn exn:fail? (λ () (term (store-lookup ,STORE0 (gensym)))) "store-lookup: address not found in store: 0")
 (test-equal (term (store-lookup ,STORE0 ,a2)) (term (5 i32)))
+
+;; =========================================================
+;; list-ref : any idx -> any
+(test-equal (term (list-ref (0 1 2) 0)) (term 0))
+(test-equal (term (list-ref ((a 0) (b 0) (c 0) (d 0)) 3)) (term (d 0)))
+(check-exn exn:fail? (λ () (term (list-ref () 1))) "list-ref: index not in range: 1")
 
 (test-results)
