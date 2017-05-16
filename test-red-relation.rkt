@@ -12,12 +12,7 @@
 (define a3 (term (ptr ,(gensym))))
 
 (define MT-ENV (term (env)))
-(define ENV0 (term [env 
-                    (a ,a0)
-                    (x ,a1)
-                    (y ,a2)
-                    (z ,a3)]))
-(check-not-false (redex-match mir-machine ρ ENV0))
+(check-not-false (redex-match mir-machine ρ MT-ENV))
 
 (define MT-STORE (term (store)))
 (define STORE0 (term (store [,a0 void]
@@ -27,6 +22,11 @@
 (check-not-false (redex-match mir-machine σ STORE0))
 
 (define MT-FRM (term (frm)))
+(define FRM0 (term [frm 
+                    (a ,a0)
+                    (x ,a1)
+                    (y ,a2)
+                    (z ,a3)]))
 (check-not-false (redex-match mir-machine frame MT-FRM))
 
 ;; Reduction tests
@@ -37,60 +37,60 @@
 (function-eval-tests)
 
 (define (statement-eval-tests)
-  (test-->> run (term ((= a (1 i32)) ,STORE0 ,ENV0 ,MT-FRM))
+  (test-->> run (term ((= a (1 i32)) ,STORE0 ,MT-ENV ,FRM0))
             (term (void (store [,a0 (1 i32)]
                                [,a1 ,a2]
                                [,a2 (5 i32)]
                                [,a3 void])
-                        ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((= a (+ (1 i32) (1 i32))) ,STORE0 ,ENV0 ,MT-FRM))
+                        ,MT-ENV ,FRM0)))
+  (test-->> run (term ((= a (+ (1 i32) (1 i32))) ,STORE0 ,MT-ENV ,FRM0))
             (term (void (store [,a0 (2 i32)]
                                [,a1 ,a2]
                                [,a2 (5 i32)]
                                [,a3 void])
-                        ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((* x) ,STORE0 ,ENV0 ,MT-FRM))
-            (term (,a2 ,STORE0 ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((= (* x) (1 i32)) ,STORE0 ,ENV0 ,MT-FRM)) ; *x = 1 
+                        ,MT-ENV ,FRM0)))
+  (test-->> run (term ((* x) ,STORE0 ,MT-ENV ,FRM0))
+            (term (,a2 ,STORE0 ,MT-ENV ,FRM0)))
+  (test-->> run (term ((= (* x) (1 i32)) ,STORE0 ,MT-ENV ,FRM0)) ; *x = 1 
             (term (void (store [,a0 void]
                                [,a1 ,a2]
                                [,a2 (1 i32)] ; *x
                                [,a3 void])
-                        ,ENV0 ,MT-FRM)))
+                        ,MT-ENV ,FRM0)))
   (test-->> run (term ((let-vars ([= a (1 i32)] ; run multiple statements
                                   [= (* x) (2 i32)]))
-                       ,STORE0 ,ENV0 ,MT-FRM))
+                       ,STORE0 ,MT-ENV ,FRM0))
             (term (void (store [,a0 (1 i32)]
                                [,a1 ,a2]
                                [,a2 (2 i32)] ; *x
                                [,a3 void])
-                        ,ENV0 ,MT-FRM)))
+                        ,MT-ENV ,FRM0)))
   (test-results))
 
 (statement-eval-tests)
 
 (define (rv-eval-tests)
-  (test-->> run (term ((use y) ,STORE0 ,ENV0 ,MT-FRM))
-            (term ((5 i32) ,STORE0 ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((use z) ,STORE0 ,ENV0 ,MT-FRM))
-            (term (void ,STORE0 ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((& mut x) ,STORE0 ,ENV0 ,MT-FRM))
-            (term (,a1 ,STORE0 ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((+ (1 i32) (2 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term ((3 i32) ,STORE0 ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((- (4 i32) (-20 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term ((24 i32) ,STORE0 ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((* (5 i32) (6 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term ((30 i32) ,STORE0 ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((< (1 i32) (2 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term (#t ,STORE0 ,ENV0 ,MT-FRM)))
-  (test-->> run (term ((% (-10 i32) (3 i32)) ,STORE0 ,ENV0 ,MT-FRM)) (term ((-1 i32) ,STORE0 ,ENV0 ,MT-FRM)))
-  (test--> run (term ((! #t) ,STORE0 ,ENV0 ,MT-FRM)) (term (#f ,STORE0 ,ENV0 ,MT-FRM)))
+  (test-->> run (term ((use y) ,STORE0 ,MT-ENV ,FRM0))
+            (term ((5 i32) ,STORE0 ,MT-ENV ,FRM0)))
+  (test-->> run (term ((use z) ,STORE0 ,MT-ENV ,FRM0))
+            (term (void ,STORE0 ,MT-ENV ,FRM0)))
+  (test-->> run (term ((& mut x) ,STORE0 ,MT-ENV ,FRM0))
+            (term (,a1 ,STORE0 ,MT-ENV ,FRM0)))
+  (test-->> run (term ((+ (1 i32) (2 i32)) ,STORE0 ,MT-ENV ,FRM0)) (term ((3 i32) ,STORE0 ,MT-ENV ,FRM0)))
+  (test-->> run (term ((- (4 i32) (-20 i32)) ,STORE0 ,MT-ENV ,FRM0)) (term ((24 i32) ,STORE0 ,MT-ENV ,FRM0)))
+  (test-->> run (term ((* (5 i32) (6 i32)) ,STORE0 ,MT-ENV ,FRM0)) (term ((30 i32) ,STORE0 ,MT-ENV ,FRM0)))
+  (test-->> run (term ((< (1 i32) (2 i32)) ,STORE0 ,MT-ENV ,FRM0)) (term (#t ,STORE0 ,MT-ENV ,FRM0)))
+  (test-->> run (term ((% (-10 i32) (3 i32)) ,STORE0 ,MT-ENV ,FRM0)) (term ((-1 i32) ,STORE0 ,MT-ENV ,FRM0)))
+  (test--> run (term ((! #t) ,STORE0 ,MT-ENV ,FRM0)) (term (#f ,STORE0 ,MT-ENV ,FRM0)))
   (test-->> run
-            (term ((+ (use y) (1 i32)) ,STORE0 ,ENV0 ,MT-FRM)) ; y + 1
-            (term ((6 i32) ,STORE0 ,ENV0 ,MT-FRM)))
+            (term ((+ (use y) (1 i32)) ,STORE0 ,MT-ENV ,FRM0)) ; y + 1
+            (term ((6 i32) ,STORE0 ,MT-ENV ,FRM0)))
   (test-->> run
-            (term ((+ (1 i32) (use y)) ,STORE0 ,ENV0 ,MT-FRM)) ; 1 + y
-            (term ((6 i32) ,STORE0 ,ENV0 ,MT-FRM)))
+            (term ((+ (1 i32) (use y)) ,STORE0 ,MT-ENV ,FRM0)) ; 1 + y
+            (term ((6 i32) ,STORE0 ,MT-ENV ,FRM0)))
   (test-->> run
-            (term ((+ (use y) (use y)) ,STORE0 ,ENV0 ,MT-FRM))
-            (term ((10 i32) ,STORE0 ,ENV0 ,MT-FRM)))
+            (term ((+ (use y) (use y)) ,STORE0 ,MT-ENV ,FRM0))
+            (term ((10 i32) ,STORE0 ,MT-ENV ,FRM0)))
   (test-results))
 
 (rv-eval-tests)
@@ -98,14 +98,13 @@
 ;; Metafunction tests
 ;; =========================================================
 ;; deref : σ ρ x -> v
-(test-equal (term (deref ,STORE0 ,ENV0 x)) (term ,a2))
-(test-equal (term (deref ,STORE0 ,ENV0 y)) (term (5 i32)))
+(test-equal (term (deref ,STORE0 ,FRM0 x)) (term ,a2))
+(test-equal (term (deref ,STORE0 ,FRM0 y)) (term (5 i32)))
 
 ;; =========================================================
-;; env-lookup : ρ x -> α
-(check-exn exn:fail? (λ () (term (env-lookup (env) x))) "env-lookup: variable not found in environment: x")
-(check-exn exn:fail? (λ () (term (env-lookup (env (x ,a1)) ,a2))) "env-lookup: address not found in environment: c")
-(test-equal (term (env-lookup ,ENV0 z)) (term ,a3))
+;; frm-lookup : frame x -> frm-v
+(check-exn exn:fail? (λ () (term (frm-lookup (frm) x))) "frm-lookup: variable not found in frame x")
+(test-equal (term (frm-lookup ,FRM0 z)) (term ,a3))
 
 ;; =========================================================
 ;; store-lookup : σ α -> v

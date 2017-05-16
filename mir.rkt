@@ -130,8 +130,8 @@
   ;; frame values
   (frm-v v                             ;; heap addresses, nums, void 
          (x ...))                      ;; aggregate values like tuples, vecs.
-                                       ;;     this is a pointer to each of the
-                                       ;;     contents in the aggregate data structure 
+  ;;     this is a pointer to each of the
+  ;;     contents in the aggregate data structure 
   ;; store values 
   (v α                                 ;; pointer
      typed-num                         ;; numerical value
@@ -162,21 +162,21 @@
    (--> ((in-hole E (let-vars (void ...))) σ ρ frame)
         ((in-hole E void) σ ρ frame))
    (--> ((in-hole E (= x v)) σ ρ frame)
-        ((in-hole E void) (store-update σ ρ x v) ρ frame)
+        ((in-hole E void) (store-update σ frame x v) ρ frame)
         "store-update-var")
    (--> ((in-hole E (= α v)) σ ρ frame)
         ((in-hole E void) (store-update-direct σ α v) ρ frame)
         "store-update-direct")
    ;; Lvalues 
    (--> ((in-hole E (* x)) σ ρ frame)
-        ((in-hole E (deref σ ρ x)) σ ρ frame)
+        ((in-hole E (deref σ frame x)) σ ρ frame)
         "deref")
    ;; Rvalues 
    (--> ((in-hole E (use x_0)) σ ρ frame) 
-        ((in-hole E (deref σ ρ x_0)) σ ρ frame)
+        ((in-hole E (deref σ frame x_0)) σ ρ frame)
         "use")
    (--> ((in-hole E (& borrowkind x_0)) σ ρ frame) 
-        ((in-hole E (env-lookup ρ x_0)) σ ρ frame)
+        ((in-hole E (frm-lookup frame x_0)) σ ρ frame)
         "ref")
    (--> ((in-hole E (binop const_1 const_2)) σ ρ frame)
         ((in-hole E (eval-binop binop const_1 const_2)) σ ρ frame)
@@ -190,9 +190,11 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define-metafunction mir-machine
   ;; Returns the value mapped to this variable in the store 
-  deref : σ ρ x -> v
-  [(deref σ ρ x) (store-lookup σ α)
-                 (where α (env-lookup ρ x))])
+  deref : σ frame x -> v
+  [(deref σ frame x) (store-lookup σ α)
+                     (where α (frm-lookup frame x))]
+  ;; TODO handle aggregate values
+  )
 
 (define-metafunction mir-machine
   ;; Returns the value mapped to the address α in the store 
@@ -202,11 +204,11 @@
 
 (define-metafunction mir-machine
   ;; Updates the value mapped to this variable in the heap
-  store-update : σ ρ x v -> σ
-  [(store-update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) ρ x_0 v_new)
+  store-update : σ frame x v -> σ
+  [(store-update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) frame x_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
-   (where α_0 (env-lookup ρ x_0))]
-  [(store-update (store (α_1 v_1) ...) ρ x v) ,(error "store-update: address not found in store:" (term x))])
+   (where α_0 (frm-lookup frame x_0))]
+  [(store-update (store (α_1 v_1) ...) frame x v) ,(error "store-update: address not found in store:" (term x))])
 
 (define-metafunction mir-machine
   ;; Updates the value at the address in the store
@@ -214,6 +216,12 @@
   [(store-update-direct (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)]
   [(store-update-direct (store (α_1 v_1) ...) α v) ,(error "store-update-direct: address not found in store:" (term α))])
+
+(define-metafunction mir-machine
+  ;; Returns the address mapped to the variable x in the env 
+  frm-lookup : frame x -> frm-v
+  [(frm-lookup (frm (x_1 frm-v_1) ... (x_0 frm-v_0) (x_2 frm-v_2) ...) x_0) frm-v_0]
+  [(frm-lookup (frm (x_1 frm-v_1) ...) x) ,(error "frm-lookup: variable not found in frame:" (term x))])
 
 (define-metafunction mir-machine
   ;; Returns the address mapped to the variable x in the env 
