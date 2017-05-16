@@ -35,7 +35,8 @@
   (vars (let-vars ([= lv_!_ rv] ...)))
   
   ;; basic blocks, with a unique integer identifier, local variables and a terminator
-  (bbs (let-bbs([bb idx_!_ vars terminator] ...)))
+  (bbs (let-bbs (blk ...)))
+  (blk [bb idx_!_ vars terminator])
   
   ;; terminator
   (terminator return                              ;; return to caller
@@ -139,6 +140,8 @@
   (E hole
      ;; single function
      (E σ ρ frame)
+     ;; basic blocks
+     (bb idx E terminator)
      ;; variable statements
      (let-vars E)
      (void ... E (= lv rv) ...)
@@ -157,6 +160,14 @@
 (define run
   (reduction-relation
    mir-machine
+   (--> ((in-hole E (g (x ...) bbs idx_start)) σ ρ frame)
+        ((g (x ...) bbs (in-hole E (bb-start σ ρ frame))))
+        (where bb-start (lookup-bb bbs idx_start))
+        "fn")
+   ;; basic block control flow
+   (--> ((in-hole E (bb idx void return)) σ ρ frame)
+        ((in-hole E void) σ ρ frame)
+        "ret")
    ;; Variable assignments
    (--> ((in-hole E (let-vars (void ...))) σ ρ frame)
         ((in-hole E void) σ ρ frame))
@@ -293,3 +304,13 @@
   eval-unop-helper : unop any -> any
   [(eval-unop-helper ! any) ,(not (term any))]
   [(eval-unop-helper - any) ,(- (term any))])
+
+(define-metafunction mir-machine
+  lookup-bb : bbs idx -> blk
+  [(lookup-bb (let-bbs ([bb idx_1 vars_1 terminator_1] ...
+                        [bb idx_start vars_start terminator_start]
+                        [bb idx_2 vars_2 terminator_2] ...))
+              idx_start)
+   (bb idx_start vars_start terminator_start)]
+  [(lookup-bb bbs idx) ,(error "lookup-bb: basic block with index not found:" (term idx))])
+

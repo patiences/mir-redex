@@ -38,6 +38,23 @@
 (function-eval-tests)
 
 (define (statement-eval-tests)
+  (test-->> run (term ((main ()
+                             (let-bbs ([bb 0 (let-vars ([= a (1 i32)])) return]))
+                             0)
+                       ,STORE0 ,MT-ENV ,FRM0))
+            (term ((main () (let-bbs ([bb 0 (let-vars ([= a (1 i32)])) return])) void)
+                   (store [,a0 (1 i32)]
+                          [,a1 ,a2]
+                          [,a2 (5 i32)]
+                          [,a3 void])
+                   ,MT-ENV ,FRM0)))
+  (test-->> run (term ((bb 0 (let-vars [(= a (1 i32))]) return) ,STORE0 ,MT-ENV ,FRM0))
+            (term (void
+                   (store [,a0 (1 i32)]
+                          [,a1 ,a2]
+                          [,a2 (5 i32)]
+                          [,a3 void])
+                   ,MT-ENV ,FRM0)))
   (test-->> run (term ((= a (1 i32)) ,STORE0 ,MT-ENV ,FRM0))
             (term (void (store [,a0 (1 i32)]
                                [,a1 ,a2]
@@ -121,5 +138,17 @@
 (test-equal (term (list-ref (0 1 2) 0)) (term 0))
 (test-equal (term (list-ref ((a 0) (b 0) (c 0) (d 0)) 3)) (term (d 0)))
 (check-exn exn:fail? (λ () (term (list-ref () 1))) "list-ref: index not in range: 1")
+
+;; =========================================================
+;; lookup-bb : bbs idx -> blk
+(test-equal (term (lookup-bb (let-bbs ([bb 0 (let-vars ()) return])) 0))
+            (term [bb 0 (let-vars ()) return]))
+(test-equal (term (lookup-bb (let-bbs ([bb 0 (let-vars ()) return]
+                                       [bb 1 (let-vars ()) return]
+                                       [bb 2 (let-vars ()) return]))
+                             2))
+            (term [bb 2 (let-vars ()) return]))
+(check-exn exn:fail? (λ () (term (lookup-bb (let-bbs ()) 1))) "lookup-bb: basic block with index not found: 1")
+
 
 (test-results)
