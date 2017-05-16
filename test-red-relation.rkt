@@ -42,7 +42,7 @@
                              (let-bbs ([bb 0 (let-vars ([= a (1 i32)])) return]))
                              0)
                        ,STORE0 ,MT-ENV ,FRM0))
-            (term ((main () (let-bbs ([bb 0 (let-vars ([= a (1 i32)])) return])) void)
+            (term (void
                    (store [,a0 (1 i32)]
                           [,a1 ,a2]
                           [,a2 (5 i32)]

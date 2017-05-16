@@ -160,9 +160,8 @@
 (define run
   (reduction-relation
    mir-machine
-   (--> ((in-hole E (g (x ...) bbs idx_start)) σ ρ frame)
-        ((g (x ...) bbs (in-hole E (bb-start σ ρ frame))))
-        (where bb-start (lookup-bb bbs idx_start))
+   (--> ((in-hole E (g (x ...) bbs idx)) σ ρ frame)
+        ((in-hole E (lookup-bb bbs idx)) σ ρ frame)
         "fn")
    ;; basic block control flow
    (--> ((in-hole E (bb idx void return)) σ ρ frame)
