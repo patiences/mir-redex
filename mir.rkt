@@ -126,16 +126,12 @@
   ;; the store, addresses mapped to variables 
   (σ (store (α v) ...))
   ;; the stack frame, local variables mapped to frame values 
-  (frame (frm (x frm-v) ...))
-  ;; frame values
-  (frm-v v                             ;; heap addresses, nums, void 
-         (x ...))                      ;; aggregate values like tuples, vecs.
-  ;;     this is a pointer to each of the
-  ;;     contents in the aggregate data structure 
+  (frame (frm (x α) ...))
   ;; store values 
   (v α                                 ;; pointer
      typed-num                         ;; numerical value
-     void)                             ;; void (uninitialized)
+     void                              ;; void (uninitialized)
+     (α_0 α_1 ...))                          ;; aggregate values: keep addresses of contents
   ;; Evaluation contexts
   (E hole
      ;; single function
@@ -204,17 +200,14 @@
   ;; Returns the value mapped to this variable in the store 
   deref : σ frame x -> v
   [(deref σ frame x) (store-lookup σ α)
-                     (where α (frm-lookup frame x))]
-  ;; TODO handle dereferencing aggregate values
-  )
+                     (where α (frm-lookup frame x))])
 
 (define-metafunction mir-machine
   ;; Dereferences a projected value
   deref-projection : σ frame x f -> v
   [(deref-projection σ frame x f) (store-lookup σ α_projected)                        
-                                  (where (x_0 ...) (frm-lookup frame x))
-                                  (where x_projected (list-ref (x_0 ...) f))
-                                  (where α_projected (frm-lookup frame x_projected))])
+                                  (where (α_0 ...) (deref σ frame x))
+                                  (where α_projected (list-ref (α_0 ...) f))])
 
 (define-metafunction mir-machine
   ;; Returns the ith element of a list with form like (frm (x_0 v_0) ...)
@@ -245,10 +238,10 @@
   [(store-update-direct (store (α_1 v_1) ...) α v) ,(error "store-update-direct: address not found in store:" (term α))])
 
 (define-metafunction mir-machine
-  ;; Returns the address mapped to the variable x in the env 
-  frm-lookup : frame x -> frm-v
-  [(frm-lookup (frm (x_1 frm-v_1) ... (x_0 frm-v_0) (x_2 frm-v_2) ...) x_0) frm-v_0]
-  [(frm-lookup (frm (x_1 frm-v_1) ...) x) ,(error "frm-lookup: variable not found in frame:" (term x))])
+  ;; Returns the address mapped to the variable x in the frame 
+  frm-lookup : frame x -> α
+  [(frm-lookup (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...) x_0) α_0]
+  [(frm-lookup (frm (x_1 α_1) ...) x) ,(error "frm-lookup: variable not found in frame:" (term x))])
 
 (define-metafunction mir-machine
   ;; Returns the address mapped to the variable x in the env 

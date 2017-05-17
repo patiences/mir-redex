@@ -10,6 +10,7 @@
 (define a1 (term (ptr ,(gensym))))
 (define a2 (term (ptr ,(gensym))))
 (define a3 (term (ptr ,(gensym))))
+(define a4 (term (ptr ,(gensym))))
 
 (define MT-ENV (term (env)))
 (check-not-false (redex-match mir-machine ρ MT-ENV))
@@ -18,7 +19,8 @@
 (define STORE0 (term (store [,a0 void]
                             [,a1 ,a2]
                             [,a2 (5 i32)]
-                            [,a3 void])))
+                            [,a3 void]
+                            [,a4 (,a0 ,a2)])))
 (check-not-false (redex-match mir-machine σ STORE0))
 
 (define MT-FRM (term (frm)))
@@ -27,7 +29,7 @@
                     (x ,a1)
                     (y ,a2)
                     (z ,a3)
-                    (xyz (x y z))]))
+                    (xyz ,a4)]))
 (check-not-false (redex-match mir-machine frame MT-FRM))
 
 ;; Reduction tests
@@ -46,26 +48,30 @@
                    (store [,a0 (1 i32)]
                           [,a1 ,a2]
                           [,a2 (5 i32)]
-                          [,a3 void])
+                          [,a3 void]
+                          [,a4 (,a0 ,a2)])
                    ,MT-ENV ,FRM0)))
   (test-->> run (term ((bb 0 (let-vars [(= a (1 i32))]) return) ,STORE0 ,MT-ENV ,FRM0))
             (term (void
                    (store [,a0 (1 i32)]
                           [,a1 ,a2]
                           [,a2 (5 i32)]
-                          [,a3 void])
+                          [,a3 void]
+                          [,a4 (,a0 ,a2)])
                    ,MT-ENV ,FRM0)))
   (test-->> run (term ((= a (1 i32)) ,STORE0 ,MT-ENV ,FRM0))
             (term (void (store [,a0 (1 i32)]
                                [,a1 ,a2]
                                [,a2 (5 i32)]
-                               [,a3 void])
+                               [,a3 void]
+                               [,a4 (,a0 ,a2)])
                         ,MT-ENV ,FRM0)))
   (test-->> run (term ((= a (+ (1 i32) (1 i32))) ,STORE0 ,MT-ENV ,FRM0))
             (term (void (store [,a0 (2 i32)]
                                [,a1 ,a2]
                                [,a2 (5 i32)]
-                               [,a3 void])
+                               [,a3 void]
+                               [,a4 (,a0 ,a2)])
                         ,MT-ENV ,FRM0)))
   (test-->> run (term ((* x) ,STORE0 ,MT-ENV ,FRM0))
             (term (,a2 ,STORE0 ,MT-ENV ,FRM0)))
@@ -75,7 +81,8 @@
             (term (void (store [,a0 void]
                                [,a1 ,a2]
                                [,a2 (1 i32)] ; *x
-                               [,a3 void])
+                               [,a3 void]
+                               [,a4 (,a0 ,a2)])
                         ,MT-ENV ,FRM0)))
   (test-->> run (term ((let-vars ([= a (1 i32)] ; run multiple statements
                                   [= (* x) (2 i32)]))
@@ -83,7 +90,8 @@
             (term (void (store [,a0 (1 i32)]
                                [,a1 ,a2]
                                [,a2 (2 i32)] ; *x
-                               [,a3 void])
+                               [,a3 void]
+                               [,a4 (,a0 ,a2)])
                         ,MT-ENV ,FRM0)))
   (test-results))
 
@@ -120,7 +128,12 @@
 ;; deref : σ ρ x -> v
 (test-equal (term (deref ,STORE0 ,FRM0 x)) (term ,a2))
 (test-equal (term (deref ,STORE0 ,FRM0 y)) (term (5 i32)))
-;(test-equal (term (deref ,STORE0 ,FRM0 xyz)) (term ,a2))
+;(test-equal (term (deref ,STORE0 ,FRM0 xyz)) (term ,a4))
+
+;; =========================================================
+;; deref-projection : σ frame x f -> v
+(test-equal (term (deref-projection ,STORE0 ,FRM0 xyz 1))
+            (term (5 i32)))
 
 ;; =========================================================
 ;; frm-lookup : frame x -> frm-v
