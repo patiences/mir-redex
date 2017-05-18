@@ -12,6 +12,9 @@
 (define a3 (term (ptr ,(gensym))))
 (define a4 (term (ptr ,(gensym))))
 
+(define PROG0 (term ([main () (let-bbs ([bb 0 (let-vars ()) return])) 0])))
+(check-not-false (redex-match mir-machine prog PROG0))
+
 (define MT-ENV (term (env)))
 (check-not-false (redex-match mir-machine ρ MT-ENV))
 
@@ -34,10 +37,12 @@
 
 ;; Reduction tests
 ;; =========================================================
-(define (function-eval-tests)
+(define (function-call-tests)
+  (test-->> run PROG0
+        (term (,PROG0 (callfn main ()) ,MT-STORE ,MT-ENV ,MT-FRM)))
   (test-results))
 
-(function-eval-tests)
+(function-call-tests)
 
 (define (statement-eval-tests)
   (test-->> run (term ((main ()
@@ -128,7 +133,8 @@
 ;; deref : σ ρ x -> v
 (test-equal (term (deref ,STORE0 ,FRM0 x)) (term ,a2))
 (test-equal (term (deref ,STORE0 ,FRM0 y)) (term (5 i32)))
-;(test-equal (term (deref ,STORE0 ,FRM0 xyz)) (term ,a4))
+; dereferencing an aggregate value gets a list of addresses
+(test-equal (term (deref ,STORE0 ,FRM0 xyz)) (term (,a0 ,a2)))
 
 ;; =========================================================
 ;; deref-projection : σ frame x f -> v

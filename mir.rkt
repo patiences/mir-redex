@@ -5,12 +5,10 @@
 ;; A Redex model for the intermediate representation (MIR) inside the
 ;; Rust compiler.
 
-;; This is an implementation that discards most type information. 
-;; Since we don't need type information to evaluate the program
-;; in most cases, let's see what happens when we don't have it.
-;; (An exception to this is type casting which can show up in an rvalue,
-;; in that case maybe we can just use typed nums everywhere, i.e. 5i32
-;; instead of 5)
+;; This is an implementation that discards most type information
+;; (except typed nums). Since we don't need type information to
+;; evaluate the program in most cases, let's see what happens when
+;; we don't have it.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
 ;; Grammar
@@ -18,8 +16,7 @@
 (define-language mir
   ;; program
   ;;     fns: list of functions
-  ;;     call: i.e. main, the entrance function call into the program
-  (prog fns call)
+  (prog fns)
   
   ;; functions
   (fns [fn ...])
@@ -127,6 +124,8 @@
   (σ (store (α v) ...))
   ;; the stack frame, local variables mapped to frame values 
   (frame (frm (x α) ...))
+  ;; function call, with parameters 
+  (callfn g (rv ...))
   ;; store values 
   (v α                                 ;; pointer
      typed-num                         ;; numerical value
@@ -156,6 +155,9 @@
 (define run
   (reduction-relation
    mir-machine
+   (--> prog
+        (prog (callfn main ()) (store) (env) (frm))
+        "call main")
    (--> ((in-hole E (g (x ...) bbs idx)) σ ρ frame)
         ((in-hole E (lookup-bb bbs idx)) σ ρ frame)
         "fn")
