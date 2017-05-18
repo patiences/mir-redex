@@ -108,8 +108,7 @@
   (idx integer)                                   ;; indices 
   (x variable-not-otherwise-mentioned)            ;; variables 
   (f integer)                                     ;; field "names"
-  (g variable-not-otherwise-mentioned)            ;; function names
-  (s variable-not-otherwise-mentioned))
+  (g variable-not-otherwise-mentioned))           ;; function names
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluation
@@ -135,8 +134,7 @@
      (α_0 α_1 ...))                    ;; aggregate values: keep addresses of contents
   ;; Evaluation contexts
   (E hole
-     ;; single function
-     (E σ ρ stk)
+     (prog E σ ρ stack)
      ;; basic blocks
      (bb idx E terminator)
      ;; variable statements
@@ -161,43 +159,42 @@
    (--> prog
         (prog (callfn main ()) (store) (env) (stk))
         "call main")
-   ;; FIXME
-   (--> ((in-hole E (g (x ...) bbs idx)) σ ρ stack)
-        ((in-hole E (lookup-bb bbs idx)) σ ρ stack)
-        "fn")
+   (--> (prog (in-hole E (callfn g (rv ...))) σ ρ stack)
+        (prog (in-hole E (lookup-fn prog g)) σ ρ stack)
+        "callfn")
    ;; basic block control flow
-   (--> ((in-hole E (bb idx void return)) σ ρ stack)
-        ((in-hole E void) σ ρ stack)
+   (--> (prog (in-hole E (bb idx void return)) σ ρ stack)
+        (prog (in-hole E void) σ ρ stack)
         "ret")
    ;; Variable assignments
-   (--> ((in-hole E (let-vars (void ...))) σ ρ stack)
-        ((in-hole E void) σ ρ stack))
-   (--> ((in-hole E (= x v)) σ ρ stack)
-        ((in-hole E void) (store-update σ stack x v) ρ stack)
+   (--> (prog (in-hole E (let-vars (void ...))) σ ρ stack)
+        (prog (in-hole E void) σ ρ stack))
+   (--> (prog (in-hole E (= x v)) σ ρ stack)
+        (prog (in-hole E void) (store-update σ stack x v) ρ stack)
         "store-update-var")
-   (--> ((in-hole E (= α v)) σ ρ stack)
-        ((in-hole E void) (store-update-direct σ α v) ρ stack)
+   (--> (prog (in-hole E (= α v)) σ ρ stack)
+        (prog (in-hole E void) (store-update-direct σ α v) ρ stack)
         "store-update-direct")
    ;; Lvalues 
-   (--> ((in-hole E (* x)) σ ρ stack)
-        ((in-hole E (deref σ stack x)) σ ρ stack)
+   (--> (prog (in-hole E (* x)) σ ρ stack)
+        (prog (in-hole E (deref σ stack x)) σ ρ stack)
         "deref")
-   (--> ((in-hole E (· x f)) σ ρ stack)
-        ((in-hole E (deref-projection σ stack x f)) σ ρ stack)
+   (--> (prog (in-hole E (· x f)) σ ρ stack)
+        (prog (in-hole E (deref-projection σ stack x f)) σ ρ stack)
         "deref-projection")
    ;; Rvalues 
-   (--> ((in-hole E (use x_0)) σ ρ stack) 
-        ((in-hole E (deref σ stack x_0)) σ ρ stack)
+   (--> (prog (in-hole E (use x_0)) σ ρ stack) 
+        (prog (in-hole E (deref σ stack x_0)) σ ρ stack)
         "use")
-   (--> ((in-hole E (& borrowkind x_0)) σ ρ stack)
+   (--> (prog (in-hole E (& borrowkind x_0)) σ ρ stack)
         ; assuming x_0 is in the current stack frame
-        ((in-hole E (frm-lookup (list-ref stack 1) x_0)) σ ρ stack) 
+        (prog (in-hole E (frm-lookup (list-ref stack 1) x_0)) σ ρ stack) 
         "ref")
-   (--> ((in-hole E (binop const_1 const_2)) σ ρ stack)
-        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ stack)
+   (--> (prog (in-hole E (binop const_1 const_2)) σ ρ stack)
+        (prog (in-hole E (eval-binop binop const_1 const_2)) σ ρ stack)
         "binop")
-   (--> ((in-hole E (unop const)) σ ρ stack)
-        ((in-hole E (eval-unop unop const)) σ ρ stack)
+   (--> (prog (in-hole E (unop const)) σ ρ stack)
+        (prog (in-hole E (eval-unop unop const)) σ ρ stack)
         "unop")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -307,6 +304,7 @@
   [(eval-unop-helper - any) ,(- (term any))])
 
 (define-metafunction mir-machine
+  ;; Find the block with the given index 
   lookup-bb : bbs idx -> blk
   [(lookup-bb (let-bbs ([bb idx_1 vars_1 terminator_1] ...
                         [bb idx_start vars_start terminator_start]
@@ -314,4 +312,11 @@
               idx_start)
    (bb idx_start vars_start terminator_start)]
   [(lookup-bb bbs idx) ,(error "lookup-bb: basic block with index not found:" (term idx))])
+
+(define-metafunction mir-machine
+  ;; Find the function with the given name
+  lookup-fn : prog g -> fn
+  [(lookup-fn ((g_1 (x_1 ...) bbs_1 idx_1) ... (g_0 (x_0 ...) bbs_0 idx_0) (g_2 (x_2 ...) bbs_2 idx_2) ...) g_0)
+   (g_0 (x_0 ...) bbs_0 idx_0)]
+  [(lookup-fn prog g) ,(error "lookup-fn: function with name not found:" (term g))])
 

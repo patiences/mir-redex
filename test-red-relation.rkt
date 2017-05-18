@@ -12,7 +12,8 @@
 (define a3 (term (ptr ,(gensym))))
 (define a4 (term (ptr ,(gensym))))
 
-(define PROG0 (term ([main () (let-bbs ([bb 0 (let-vars ()) return])) 0])))
+(define MT-MAIN (term [main () (let-bbs ([bb 0 (let-vars ()) return])) 0]))
+(define PROG0 (term (,MT-MAIN)))
 (check-not-false (redex-match mir-machine prog PROG0))
 
 (define MT-ENV (term (env)))
@@ -43,91 +44,110 @@
 ;; =========================================================
 (define (function-call-tests)
   (test-->> run PROG0
-        (term (,PROG0 (callfn main ()) ,MT-STORE ,MT-ENV ,MT-STK)))
+            (term (,PROG0 ,MT-MAIN ,MT-STORE ,MT-ENV ,MT-STK)))
   (test-results))
 
 (function-call-tests)
 
 (define (statement-eval-tests)
-  (test-->> run (term ((main ()
-                             (let-bbs ([bb 0 (let-vars ([= a (1 i32)])) return]))
-                             0)
+  
+  (test-->> run (term (,PROG0
+                       (bb 0 (let-vars [(= a (1 i32))]) return)
                        ,STORE0 ,MT-ENV ,STK0))
-            (term (void
+            (term (,PROG0
+                   void
                    (store [,a0 (1 i32)]
                           [,a1 ,a2]
                           [,a2 (5 i32)]
                           [,a3 void]
                           [,a4 (,a0 ,a2)])
                    ,MT-ENV ,STK0)))
-  (test-->> run (term ((bb 0 (let-vars [(= a (1 i32))]) return) ,STORE0 ,MT-ENV ,STK0))
-            (term (void
+  (test-->> run (term (,PROG0
+                       (= a (1 i32))
+                       ,STORE0 ,MT-ENV ,STK0))
+            (term (,PROG0
+                   void
                    (store [,a0 (1 i32)]
                           [,a1 ,a2]
                           [,a2 (5 i32)]
                           [,a3 void]
                           [,a4 (,a0 ,a2)])
                    ,MT-ENV ,STK0)))
-  (test-->> run (term ((= a (1 i32)) ,STORE0 ,MT-ENV ,STK0))
-            (term (void (store [,a0 (1 i32)]
-                               [,a1 ,a2]
-                               [,a2 (5 i32)]
-                               [,a3 void]
-                               [,a4 (,a0 ,a2)])
-                        ,MT-ENV ,STK0)))
-  (test-->> run (term ((= a (+ (1 i32) (1 i32))) ,STORE0 ,MT-ENV ,STK0))
-            (term (void (store [,a0 (2 i32)]
-                               [,a1 ,a2]
-                               [,a2 (5 i32)]
-                               [,a3 void]
-                               [,a4 (,a0 ,a2)])
-                        ,MT-ENV ,STK0)))
-  (test-->> run (term ((* x) ,STORE0 ,MT-ENV ,STK0))
-            (term (,a2 ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term ((· xyz 1) ,STORE0 ,MT-ENV ,STK0))
-            (term ((5 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term ((= (* x) (1 i32)) ,STORE0 ,MT-ENV ,STK0)) ; *x = 1 
-            (term (void (store [,a0 void]
-                               [,a1 ,a2]
-                               [,a2 (1 i32)] ; *x
-                               [,a3 void]
-                               [,a4 (,a0 ,a2)])
-                        ,MT-ENV ,STK0)))
-  (test-->> run (term ((let-vars ([= a (1 i32)] ; run multiple statements
+  (test-->> run (term (,PROG0
+                       (= a (+ (1 i32) (1 i32)))
+                       ,STORE0 ,MT-ENV ,STK0))
+            (term (,PROG0
+                   void
+                   (store [,a0 (2 i32)]
+                          [,a1 ,a2]
+                          [,a2 (5 i32)]
+                          [,a3 void]
+                          [,a4 (,a0 ,a2)])
+                   ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0
+                       (* x)
+                       ,STORE0 ,MT-ENV ,STK0))
+            (term (,PROG0
+                   ,a2
+                   ,STORE0 ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0
+                       (· xyz 1)
+                       ,STORE0 ,MT-ENV ,STK0))
+            (term (,PROG0
+                   (5 i32)
+                   ,STORE0 ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0
+                       (= (* x) (1 i32))       ; *x = 1 
+                       ,STORE0 ,MT-ENV ,STK0)) 
+            (term (,PROG0
+                   void
+                   (store [,a0 void]
+                          [,a1 ,a2]
+                          [,a2 (1 i32)] ; *x
+                          [,a3 void]
+                          [,a4 (,a0 ,a2)])
+                   ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0
+                       (let-vars ([= a (1 i32)] ; run multiple statements
                                   [= (* x) (2 i32)]))
                        ,STORE0 ,MT-ENV ,STK0))
-            (term (void (store [,a0 (1 i32)]
-                               [,a1 ,a2]
-                               [,a2 (2 i32)] ; *x
-                               [,a3 void]
-                               [,a4 (,a0 ,a2)])
-                        ,MT-ENV ,STK0)))
+            (term (,PROG0
+                   void
+                   (store [,a0 (1 i32)]
+                          [,a1 ,a2]
+                          [,a2 (2 i32)] ; *x
+                          [,a3 void]
+                          [,a4 (,a0 ,a2)])
+                   ,MT-ENV ,STK0)))
   (test-results))
 
 (statement-eval-tests)
 
 (define (rv-eval-tests)
-  (test-->> run (term ((use y) ,STORE0 ,MT-ENV ,STK0))
-            (term ((5 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term ((use z) ,STORE0 ,MT-ENV ,STK0))
-            (term (void ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term ((& mut x) ,STORE0 ,MT-ENV ,STK0))
-            (term (,a1 ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term ((+ (1 i32) (2 i32)) ,STORE0 ,MT-ENV ,STK0)) (term ((3 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term ((- (4 i32) (-20 i32)) ,STORE0 ,MT-ENV ,STK0)) (term ((24 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term ((* (5 i32) (6 i32)) ,STORE0 ,MT-ENV ,STK0)) (term ((30 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term ((< (1 i32) (2 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (#t ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term ((% (-10 i32) (3 i32)) ,STORE0 ,MT-ENV ,STK0)) (term ((-1 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test--> run (term ((! #t) ,STORE0 ,MT-ENV ,STK0)) (term (#f ,STORE0 ,MT-ENV ,STK0)))
+  ;; These tests use a mocked empty program PROG0
+  
+  ;; FIXME: clean up these tests, difficult to read 
+  (test-->> run (term (,PROG0 (use y) ,STORE0 ,MT-ENV ,STK0))
+            (term (,PROG0 (5 i32) ,STORE0 ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0 (use z) ,STORE0 ,MT-ENV ,STK0))
+            (term (,PROG0 void ,STORE0 ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0 (& mut x) ,STORE0 ,MT-ENV ,STK0))
+            (term (,PROG0 ,a1 ,STORE0 ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0 (+ (1 i32) (2 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 (3 i32) ,STORE0 ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0 (- (4 i32) (-20 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 (24 i32) ,STORE0 ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0 (* (5 i32) (6 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 (30 i32) ,STORE0 ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0 (< (1 i32) (2 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 #t ,STORE0 ,MT-ENV ,STK0)))
+  (test-->> run (term (,PROG0 (% (-10 i32) (3 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 (-1 i32) ,STORE0 ,MT-ENV ,STK0)))
+  (test--> run (term (,PROG0 (! #t) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 #f ,STORE0 ,MT-ENV ,STK0)))
   (test-->> run
-            (term ((+ (use y) (1 i32)) ,STORE0 ,MT-ENV ,STK0)) ; y + 1
-            (term ((6 i32) ,STORE0 ,MT-ENV ,STK0)))
+            (term (,PROG0 (+ (use y) (1 i32)) ,STORE0 ,MT-ENV ,STK0)) ; y + 1
+            (term (,PROG0 (6 i32) ,STORE0 ,MT-ENV ,STK0)))
   (test-->> run
-            (term ((+ (1 i32) (use y)) ,STORE0 ,MT-ENV ,STK0)) ; 1 + y
-            (term ((6 i32) ,STORE0 ,MT-ENV ,STK0)))
+            (term (,PROG0 (+ (1 i32) (use y)) ,STORE0 ,MT-ENV ,STK0)) ; 1 + y
+            (term (,PROG0 (6 i32) ,STORE0 ,MT-ENV ,STK0)))
   (test-->> run
-            (term ((+ (use y) (use y)) ,STORE0 ,MT-ENV ,STK0))
-            (term ((10 i32) ,STORE0 ,MT-ENV ,STK0)))
+            (term (,PROG0 (+ (use y) (use y)) ,STORE0 ,MT-ENV ,STK0))
+            (term (,PROG0 (10 i32) ,STORE0 ,MT-ENV ,STK0)))
   (test-results))
 
 (rv-eval-tests)
@@ -173,5 +193,9 @@
             (term [bb 2 (let-vars ()) return]))
 (check-exn exn:fail? (λ () (term (lookup-bb (let-bbs ()) 1))) "lookup-bb: basic block with index not found: 1")
 
+;; =========================================================
+;; lookup-fn : prog g -> fn
+(test-equal (term (lookup-fn ,PROG0 main)) MT-MAIN)
+(check-exn exn:fail? (λ () (term (lookup-fn () main))) "lookup-fn: function with name not found: main")
 
 (test-results)
