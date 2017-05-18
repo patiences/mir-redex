@@ -122,7 +122,9 @@
   (α (ptr variable-not-otherwise-mentioned))
   ;; the store, addresses mapped to variables 
   (σ (store (α v) ...))
-  ;; the stack frame, local variables mapped to frame values 
+  ;; the global stack, with the first being the current frame 
+  (stack (stk frame ...))
+  ;; a stack frame, local variables mapped to frame values 
   (frame (frm (x α) ...))
   ;; function call, with parameters 
   (callfn g (rv ...))
@@ -130,11 +132,11 @@
   (v α                                 ;; pointer
      typed-num                         ;; numerical value
      void                              ;; void (uninitialized)
-     (α_0 α_1 ...))                          ;; aggregate values: keep addresses of contents
+     (α_0 α_1 ...))                    ;; aggregate values: keep addresses of contents
   ;; Evaluation contexts
   (E hole
      ;; single function
-     (E σ ρ frame)
+     (E σ ρ stk)
      ;; basic blocks
      (bb idx E terminator)
      ;; variable statements
@@ -155,44 +157,47 @@
 (define run
   (reduction-relation
    mir-machine
+   ;; load program 
    (--> prog
-        (prog (callfn main ()) (store) (env) (frm))
+        (prog (callfn main ()) (store) (env) (stk))
         "call main")
-   (--> ((in-hole E (g (x ...) bbs idx)) σ ρ frame)
-        ((in-hole E (lookup-bb bbs idx)) σ ρ frame)
+   ;; FIXME
+   (--> ((in-hole E (g (x ...) bbs idx)) σ ρ stack)
+        ((in-hole E (lookup-bb bbs idx)) σ ρ stack)
         "fn")
    ;; basic block control flow
-   (--> ((in-hole E (bb idx void return)) σ ρ frame)
-        ((in-hole E void) σ ρ frame)
+   (--> ((in-hole E (bb idx void return)) σ ρ stack)
+        ((in-hole E void) σ ρ stack)
         "ret")
    ;; Variable assignments
-   (--> ((in-hole E (let-vars (void ...))) σ ρ frame)
-        ((in-hole E void) σ ρ frame))
-   (--> ((in-hole E (= x v)) σ ρ frame)
-        ((in-hole E void) (store-update σ frame x v) ρ frame)
+   (--> ((in-hole E (let-vars (void ...))) σ ρ stack)
+        ((in-hole E void) σ ρ stack))
+   (--> ((in-hole E (= x v)) σ ρ stack)
+        ((in-hole E void) (store-update σ stack x v) ρ stack)
         "store-update-var")
-   (--> ((in-hole E (= α v)) σ ρ frame)
-        ((in-hole E void) (store-update-direct σ α v) ρ frame)
+   (--> ((in-hole E (= α v)) σ ρ stack)
+        ((in-hole E void) (store-update-direct σ α v) ρ stack)
         "store-update-direct")
    ;; Lvalues 
-   (--> ((in-hole E (* x)) σ ρ frame)
-        ((in-hole E (deref σ frame x)) σ ρ frame)
+   (--> ((in-hole E (* x)) σ ρ stack)
+        ((in-hole E (deref σ stack x)) σ ρ stack)
         "deref")
-   (--> ((in-hole E (· x f)) σ ρ frame)
-        ((in-hole E (deref-projection σ frame x f)) σ ρ frame)
+   (--> ((in-hole E (· x f)) σ ρ stack)
+        ((in-hole E (deref-projection σ stack x f)) σ ρ stack)
         "deref-projection")
    ;; Rvalues 
-   (--> ((in-hole E (use x_0)) σ ρ frame) 
-        ((in-hole E (deref σ frame x_0)) σ ρ frame)
+   (--> ((in-hole E (use x_0)) σ ρ stack) 
+        ((in-hole E (deref σ stack x_0)) σ ρ stack)
         "use")
-   (--> ((in-hole E (& borrowkind x_0)) σ ρ frame) 
-        ((in-hole E (frm-lookup frame x_0)) σ ρ frame)
+   (--> ((in-hole E (& borrowkind x_0)) σ ρ stack)
+        ; assuming x_0 is in the current stack frame
+        ((in-hole E (frm-lookup (list-ref stack 1) x_0)) σ ρ stack) 
         "ref")
-   (--> ((in-hole E (binop const_1 const_2)) σ ρ frame)
-        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ frame)
+   (--> ((in-hole E (binop const_1 const_2)) σ ρ stack)
+        ((in-hole E (eval-binop binop const_1 const_2)) σ ρ stack)
         "binop")
-   (--> ((in-hole E (unop const)) σ ρ frame)
-        ((in-hole E (eval-unop unop const)) σ ρ frame)
+   (--> ((in-hole E (unop const)) σ ρ stack)
+        ((in-hole E (eval-unop unop const)) σ ρ stack)
         "unop")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -200,15 +205,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define-metafunction mir-machine
   ;; Returns the value mapped to this variable in the store 
-  deref : σ frame x -> v
-  [(deref σ frame x) (store-lookup σ α)
+  deref : σ stack x -> v
+  [(deref σ stack x) (store-lookup σ α)
+                     (where frame (list-ref stack 1)) ; look in the first frame 
                      (where α (frm-lookup frame x))])
 
 (define-metafunction mir-machine
   ;; Dereferences a projected value
-  deref-projection : σ frame x f -> v
-  [(deref-projection σ frame x f) (store-lookup σ α_projected)                        
-                                  (where (α_0 ...) (deref σ frame x))
+  deref-projection : σ stack x f -> v
+  [(deref-projection σ stack x f) (store-lookup σ α_projected)                        
+                                  (where (α_0 ...) (deref σ stack x))
                                   (where α_projected (list-ref (α_0 ...) f))])
 
 (define-metafunction mir-machine
@@ -226,11 +232,12 @@
 
 (define-metafunction mir-machine
   ;; Updates the value mapped to this variable in the heap
-  store-update : σ frame x v -> σ
-  [(store-update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) frame x_0 v_new)
+  store-update : σ stack x v -> σ
+  [(store-update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) stack x_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
+   (where frame (list-ref stack 1))
    (where α_0 (frm-lookup frame x_0))]
-  [(store-update (store (α_1 v_1) ...) frame x v) ,(error "store-update: address not found in store:" (term x))])
+  [(store-update (store (α_1 v_1) ...) stack x v) ,(error "store-update: address not found in store:" (term x))])
 
 (define-metafunction mir-machine
   ;; Updates the value at the address in the store
