@@ -43,11 +43,36 @@
 ;; Reduction tests
 ;; =========================================================
 (define (function-call-tests)
+  (test--> run PROG0
+           (term (,PROG0 (callfn main ()) ,MT-STORE ,MT-ENV ,MT-STK)))
   (test-->> run PROG0
-            (term (,PROG0 ,MT-MAIN ,MT-STORE ,MT-ENV ,MT-STK)))
+            (term (,PROG0 void ,MT-STORE ,MT-ENV ,MT-STK)))
+  #; ;; FIXME need to initialize the stack frame on call 
+  (test-->> run (term ((main () (let-bbs ([bb 0 (let-vars ([= a (1 i32)])) return])) 0)))
+            (term (,PROG0
+                   void
+                   (store [,a0 (1 i32)]  ; a = 1 
+                          [,a1 ,a2]
+                          [,a2 (5 i32)]
+                          [,a3 void]
+                          [,a4 (,a0 ,a2)])
+                   ,MT-ENV ,MT-STK)))
+  
   (test-results))
 
 (function-call-tests)
+
+(define (bb-eval-tests)
+  (test-->> run (term ((main () (let-bbs ([bb 0 (let-vars ([= a (1 i32)])) return])) 0)))
+            (term (,PROG0
+                   void
+                   (store [,a0 (1 i32)]  ; a = 1 
+                          [,a1 ,a2]
+                          [,a2 (5 i32)]
+                          [,a3 void]
+                          [,a4 (,a0 ,a2)])
+                   ,MT-ENV ,MT-STK)))
+  (test-results))
 
 (define (statement-eval-tests)
   
@@ -197,5 +222,81 @@
 ;; lookup-fn : prog g -> fn
 (test-equal (term (lookup-fn ,PROG0 main)) MT-MAIN)
 (check-exn exn:fail? (λ () (term (lookup-fn () main))) "lookup-fn: function with name not found: main")
+
+;; =========================================================
+;; alloc-vars : fn σ stack -> (σ stack)
+(define alloc_vars (term (alloc-vars (main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) return]
+                                                                  [bb 1 (let-vars ([= foo (6 u64)]
+                                                                                   [= foo (7 u64)]))
+                                                                      return]))
+                                                     0)
+                                               ,MT-STORE ,MT-STK)))
+(define new_store (car alloc_vars))
+(define new_stack (cadr alloc_vars))
+(define new_frame (term (list-ref ,new_stack 1)))
+(test-equal (term (is-allocated x ,new_store ,new_frame)) #t)
+(test-equal (term (is-allocated foo ,new_store ,new_frame)) #t)
+(test-equal (term (list-length ,new_stack)) 1)
+(test-equal (term (list-length ,new_frame)) 2)
+(test-equal (term (list-length ,new_store)) 2)
+
+;; =========================================================
+;; alloc-vars-helper : fn σ frame -> (σ frame)
+(define alloc_new_bbs (term (alloc-vars-helper (main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) return]
+                                                                  [bb 1 (let-vars ([= foo (6 u64)]
+                                                                                   [= bar (7 u64)]))
+                                                                      return]))
+                                                     0)
+                                               ,MT-STORE ,MT-FRM)))
+
+(define σ_new (car alloc_new_bbs))
+(define frm_new (cadr alloc_new_bbs))
+(test-equal (term (is-allocated x ,σ_new ,frm_new)) #t)
+(test-equal (term (is-allocated foo ,σ_new ,frm_new)) #t)
+(test-equal (term (is-allocated bar ,σ_new ,frm_new)) #t)
+(test-equal (term (list-length ,frm_new)) 3)
+
+;; =========================================================
+;; alloc-vars-bb : blk σ frame -> (σ frame)
+(define alloc_new_vars (term (alloc-vars-bb [bb 0 (let-vars ([= x (1 i32)])) return]
+                                            ,MT-STORE ,MT-FRM)))
+(define store_new (car alloc_new_vars))
+(define frame_new (cadr alloc_new_vars))
+(test-equal (term (is-allocated x ,store_new ,frame_new)) #t)
+
+(define alloc_more_new_vars (term (alloc-vars-bb [bb 1 (let-vars ([= foo (6 u64)]
+                                                                  [= bar (7 u64)]))
+                                                     return]
+                                                 ,store_new ,frame_new)))
+(define store_newer (car alloc_more_new_vars))
+(define frame_newer (cadr alloc_more_new_vars))
+(test-equal (term (is-allocated foo ,store_newer ,frame_newer)) #t)
+(test-equal (term (is-allocated bar ,store_newer ,frame_newer)) #t)
+
+;; =========================================================
+;; alloc-vars-bb-helper : lv σ frame -> (σ frame)
+(define alloc_new (term (alloc-vars-bb-helper new_variable ,MT-STORE ,MT-FRM)))
+(test-equal (term (is-allocated new_variable ,(car alloc_new) ,(cadr alloc_new))) #t)
+
+; variable already exists, don't allocate
+(define do_not_alloc_new (term (alloc-vars-bb-helper old_variable (store (,a1 void)) (frm (old_variable ,a1)))))
+(test-equal do_not_alloc_new
+            (term ((store (,a1 void)) (frm (old_variable ,a1)))))
+(test-equal (term (is-allocated old_variable ,(car do_not_alloc_new) ,(cadr do_not_alloc_new))) #t)
+
+;; =========================================================
+;; malloc : σ -> (σ α)
+(define malloc_once (term (malloc ,MT-STORE)))
+(define store_1 (car malloc_once))
+(test-equal (term (list-length ,store_1)) 1)
+
+(define malloc_twice (term (malloc ,store_1)))
+(define store_2 (car malloc_twice))
+(test-equal (term (list-length ,store_2)) 2)
+
+;; =========================================================
+;; is-allocated : x σ frame -> boolean
+(test-equal (term (is-allocated x (store (,a1 void)) (frm (x ,a1)))) #t) 
+(test-equal (term (is-allocated x (store) (frm))) #f)
 
 (test-results)

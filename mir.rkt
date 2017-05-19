@@ -29,7 +29,7 @@
   (fn (g (x_!_ ...) bbs idx))
   
   ;; variables with their assignments 
-  (vars (let-vars ([= lv_!_ rv] ...)))
+  (vars (let-vars ([= lv rv] ...))) ;; Are these lvalues distinct? 
   
   ;; basic blocks, with a unique integer identifier, local variables and a terminator
   (bbs (let-bbs (blk ...)))
@@ -159,9 +159,13 @@
    (--> prog
         (prog (callfn main ()) (store) (env) (stk))
         "call main")
+   ;; call function 
    (--> (prog (in-hole E (callfn g (rv ...))) σ ρ stack)
         (prog (in-hole E (lookup-fn prog g)) σ ρ stack)
         "callfn")
+   (--> (prog (in-hole E (g (x ...) bbs idx)) σ ρ stack)
+        (prog (in-hole E (lookup-bb bbs idx)) σ ρ stack)
+        "run-bb-0")
    ;; basic block control flow
    (--> (prog (in-hole E (bb idx void return)) σ ρ stack)
         (prog (in-hole E void) σ ρ stack)
@@ -222,6 +226,12 @@
   [(list-ref (any_0 any_1 ...) idx) (list-ref (any_1 ...) ,(sub1 (term idx)))]) 
 
 (define-metafunction mir-machine
+  ;; Returns the length of a list of the form (list-type element_0 ...)
+  list-length : (any ...) -> integer
+  [(list-length (any_0)) 0]
+  [(list-length (any_0 any_1 ...)) ,(add1 (term (list-length (any_1 ...))))])
+
+(define-metafunction mir-machine
   ;; Returns the value mapped to the address α in the store 
   store-lookup : σ α -> v
   [(store-lookup (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0) v_0]
@@ -255,6 +265,59 @@
   [(env-lookup (env (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...) x_0) α_0]
   [(env-lookup (env (x_1 α_1) ...) x) ,(error "env-lookup: variable not found in environment:" (term x))])
 
+;; FIXME rename these alloc- functions, confusing
+
+(define-metafunction mir-machine
+  ;; Create a stack frame, allocate space in the frame and heap for all variables in the function 
+  alloc-vars : fn σ stack -> (σ stack)
+  [(alloc-vars fn σ (stk frame ...)) (σ_new (stk frame_new frame ...))
+   (where (σ_new frame_new) (alloc-vars-helper fn σ (frm)))])
+
+(define-metafunction mir-machine
+  ;; Allocate space in the frame and heap for all variables in the function 
+  alloc-vars-helper : fn σ frame -> (σ frame)
+  ;; No bbs
+  [(alloc-vars-helper (g (x ...) (let-bbs ()) idx) σ frame) (σ frame)]
+  ;; Traverse bbs 
+  [(alloc-vars-helper (g (x ...) (let-bbs (blk_0 blk_1 ...)) idx) σ_old frame_old)
+   (alloc-vars-helper (g (x ...) (let-bbs (blk_1 ...)) idx) σ_new frame_new)
+   (where (σ_new frame_new) (alloc-vars-bb blk_0 σ_old frame_old))])
+
+(define-metafunction mir-machine
+  ;; Allocate space in the stack frame and the heap for all variables in the block 
+  alloc-vars-bb : blk σ frame -> (σ frame)
+  [(alloc-vars-bb (bb idx (let-vars ()) terminator) σ frame) (σ frame)]
+  [(alloc-vars-bb (bb idx (let-vars ([= lv_0 rv_0] [= lv_1 rv_1] ...)) terminator) σ frame)
+   (alloc-vars-bb (bb idx (let-vars ([= lv_1 rv_1] ...)) terminator) σ_new frame_new)
+   (where (σ_new frame_new) (alloc-vars-bb-helper lv_0 σ frame))])
+
+(define-metafunction mir-machine
+  ;; Allocate space for this variable if necessary
+  alloc-vars-bb-helper : lv σ frame -> (σ frame)
+  ;; x_0 has already been allocated, return 
+  [(alloc-vars-bb-helper x_0 σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...)) (σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))]
+  [(alloc-vars-bb-helper x_0 σ (frm (x α) ...))
+   (σ_new (frm (x_0 α_new) (x α) ...))
+   (where (σ_new α_new) (malloc σ))]
+  ;; FIXME handle projected and dereferenced lvalues
+  )
+
+(define-metafunction mir-machine
+  ;; Allocate a space in the heap and return the address
+  malloc : σ -> (σ α)
+  [(malloc (store (α v) ...))
+   ((store (α_new void) (α v) ...) α_new)
+   (where α_new (ptr ,(gensym)))])
+
+(define-metafunction mir-machine
+  ;; Returns true if x has been allocated in the heap and stack frame
+  is-allocated : x σ frame -> boolean
+  [(is-allocated x_0
+                 (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...)
+                 (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))
+   #t]
+  [(is-allocated x σ frame) #f])
+  
 (define-metafunction mir-machine
   ;; TODO: Non-numeric operands
   ;; i.e. http://manishearth.github.io/rust-internals-docs///rustc/middle/const_val/enum.ConstVal.html?
