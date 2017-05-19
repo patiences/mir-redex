@@ -289,6 +289,9 @@
    (alloc-vars-in-bb (bb idx (let-vars ([= lv_1 rv_1] ...)) terminator) σ_new frame_new)
    (where (σ_new frame_new) (alloc-var lv_0 σ frame))])
 
+;; This function assumes we never have projections/derefs on the left
+;; side of the assignment (which I haven't seen yet and seems to make
+;; sense). 
 (define-metafunction mir-machine
   alloc-var : lv σ frame -> (σ frame)
   ;; Allocate space for this variable if necessary
@@ -296,9 +299,7 @@
   [(alloc-var x_0 σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...)) (σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))]
   [(alloc-var x_0 σ (frm (x α) ...))
    (σ_new (frm (x_0 α_new) (x α) ...))
-   (where (σ_new α_new) (malloc σ))]
-  ;; FIXME handle projected and dereferenced lvalues
-  )
+   (where (σ_new α_new) (malloc σ))])
 
 (define-metafunction mir-machine
   malloc : σ -> (σ α)
