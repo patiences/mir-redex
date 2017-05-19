@@ -16,7 +16,14 @@
 ;; Programs and functions 
 (define MT-MAIN (term [main () (let-bbs ([bb 0 (let-vars ()) return])) 0]))
 (define PROG0 (term (,MT-MAIN)))
+
+(define PROG1 (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
+                                                         [= y (use x)]
+                                                         ))
+                                            return]))
+                           0])))
 (check-not-false (redex-match mir-machine prog PROG0))
+(check-not-false (redex-match mir-machine prog PROG1))
 
 ;; Environments 
 (define MT-ENV (term (env)))
@@ -70,19 +77,13 @@
   (test--> run PROG0
            (term (,PROG0 (callfn main ()) ,MT-STORE ,MT-ENV ,MT-STK)))
   (test-->> run PROG0
-            (term (,PROG0 void ,MT-STORE ,MT-ENV ,MT-STK)))
+            (term (,PROG0 void ,MT-STORE ,MT-ENV (stk (frm)))))
   
-  #; ;; FIXME need to initialize the stack frame on call 
-  (test-->> run (term ((main () (let-bbs ([bb 0 (let-vars ([= a (1 i32)])) return])) 0)))
-            (term (,PROG0
-                   void
-                   (store [,a0 (1 i32)]  ; a = 1 
-                          [,a1 ,a2]
-                          [,a2 (5 i32)]
-                          [,a3 void]
-                          [,a4 (,a0 ,a2)])
-                   ,MT-ENV ,MT-STK)))
-  
+  (define result_1 (car (apply-reduction-relation* run PROG1))) ; unwrap outer list
+  (test-equal (term (list-length (get-stack ,result_1))) 1) ;; 1 frame created
+  (test-equal (term (list-length (list-ref (get-stack ,result_1) 1))) 2) ;; 2 variables in the frame
+  (test-equal (term (list-length (get-store ,result_1))) 2) ;; 2 block of memory allocated
+
   (test-results))
 
 (define (bb-eval-tests)

@@ -161,7 +161,8 @@
         "call main")
    ;; call function 
    (--> (prog (in-hole E (callfn g (rv ...))) σ ρ stack)
-        (prog (in-hole E (lookup-fn prog g)) σ ρ stack)
+        (prog (in-hole E (lookup-fn prog g)) σ_new ρ stack_new)
+        (where (σ_new stack_new) (alloc-vars-in-fn (lookup-fn prog g) σ stack))
         "callfn")
    (--> (prog (in-hole E (g (x ...) bbs idx)) σ ρ stack)
         (prog (in-hole E (lookup-bb bbs idx)) σ ρ stack)
@@ -224,12 +225,6 @@
   [(list-ref () idx) ,(error "list-ref: index not in range:" (term idx))]
   [(list-ref (any_0 any_1 ...) 0) any_0]
   [(list-ref (any_0 any_1 ...) idx) (list-ref (any_1 ...) ,(sub1 (term idx)))]) 
-
-(define-metafunction mir-machine
-  list-length : (any ...) -> integer
-  ;; Returns the length of a list of the form (list-type element_0 ...)
-  [(list-length (any_0)) 0]
-  [(list-length (any_0 any_1 ...)) ,(add1 (term (list-length (any_1 ...))))])
 
 (define-metafunction mir-machine
   store-lookup : σ α -> v
@@ -382,3 +377,23 @@
   [(lookup-fn ((g_1 (x_1 ...) bbs_1 idx_1) ... (g_0 (x_0 ...) bbs_0 idx_0) (g_2 (x_2 ...) bbs_2 idx_2) ...) g_0)
    (g_0 (x_0 ...) bbs_0 idx_0)]
   [(lookup-fn prog g) ,(error "lookup-fn: function with name not found:" (term g))])
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Metafunctions for testing
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define-metafunction mir-machine
+  list-length : (any ...) -> integer
+  ;; Returns the length of a list of the form (list-type element_0 ...)
+  [(list-length (any_0)) 0]
+  [(list-length (any_0 any_1 ...)) ,(add1 (term (list-length (any_1 ...))))])
+
+(define-metafunction mir-machine
+  get-stack : (prog v σ ρ stack) -> stack
+  ;; Get the stack from the result of a reduction 
+  [(get-stack (prog v σ ρ stack)) stack])
+
+(define-metafunction mir-machine
+  get-store : (prog v σ ρ stack) -> σ
+  ;; Get the store from the result of a reduction
+  [(get-store (prog v σ ρ stack)) σ])
