@@ -224,8 +224,8 @@
 (check-exn exn:fail? (λ () (term (lookup-fn () main))) "lookup-fn: function with name not found: main")
 
 ;; =========================================================
-;; alloc-vars : fn σ stack -> (σ stack)
-(define alloc_vars (term (alloc-vars (main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) return]
+;; alloc-vars-in-fn : fn σ stack -> (σ stack)
+(define alloc_vars (term (alloc-vars-in-fn (main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) return]
                                                                   [bb 1 (let-vars ([= foo (6 u64)]
                                                                                    [= foo (7 u64)]))
                                                                       return]))
@@ -241,8 +241,8 @@
 (test-equal (term (list-length ,new_store)) 2)
 
 ;; =========================================================
-;; alloc-vars-helper : fn σ frame -> (σ frame)
-(define alloc_new_bbs (term (alloc-vars-helper (main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) return]
+;; alloc-vars-in-fn-helper : fn σ frame -> (σ frame)
+(define alloc_new_bbs (term (alloc-vars-in-fn-helper (main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) return]
                                                                   [bb 1 (let-vars ([= foo (6 u64)]
                                                                                    [= bar (7 u64)]))
                                                                       return]))
@@ -257,14 +257,14 @@
 (test-equal (term (list-length ,frm_new)) 3)
 
 ;; =========================================================
-;; alloc-vars-bb : blk σ frame -> (σ frame)
-(define alloc_new_vars (term (alloc-vars-bb [bb 0 (let-vars ([= x (1 i32)])) return]
+;; alloc-vars-in-bb : blk σ frame -> (σ frame)
+(define alloc_new_vars (term (alloc-vars-in-bb [bb 0 (let-vars ([= x (1 i32)])) return]
                                             ,MT-STORE ,MT-FRM)))
 (define store_new (car alloc_new_vars))
 (define frame_new (cadr alloc_new_vars))
 (test-equal (term (is-allocated x ,store_new ,frame_new)) #t)
 
-(define alloc_more_new_vars (term (alloc-vars-bb [bb 1 (let-vars ([= foo (6 u64)]
+(define alloc_more_new_vars (term (alloc-vars-in-bb [bb 1 (let-vars ([= foo (6 u64)]
                                                                   [= bar (7 u64)]))
                                                      return]
                                                  ,store_new ,frame_new)))
@@ -274,12 +274,12 @@
 (test-equal (term (is-allocated bar ,store_newer ,frame_newer)) #t)
 
 ;; =========================================================
-;; alloc-vars-bb-helper : lv σ frame -> (σ frame)
-(define alloc_new (term (alloc-vars-bb-helper new_variable ,MT-STORE ,MT-FRM)))
+;; alloc-var : lv σ frame -> (σ frame)
+(define alloc_new (term (alloc-var new_variable ,MT-STORE ,MT-FRM)))
 (test-equal (term (is-allocated new_variable ,(car alloc_new) ,(cadr alloc_new))) #t)
 
 ; variable already exists, don't allocate
-(define do_not_alloc_new (term (alloc-vars-bb-helper old_variable (store (,a1 void)) (frm (old_variable ,a1)))))
+(define do_not_alloc_new (term (alloc-var old_variable (store (,a1 void)) (frm (old_variable ,a1)))))
 (test-equal do_not_alloc_new
             (term ((store (,a1 void)) (frm (old_variable ,a1)))))
 (test-equal (term (is-allocated old_variable ,(car do_not_alloc_new) ,(cadr do_not_alloc_new))) #t)

@@ -265,38 +265,36 @@
   [(env-lookup (env (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...) x_0) α_0]
   [(env-lookup (env (x_1 α_1) ...) x) ,(error "env-lookup: variable not found in environment:" (term x))])
 
-;; FIXME rename these alloc- functions, confusing
-
 (define-metafunction mir-machine
-  alloc-vars : fn σ stack -> (σ stack)
+  alloc-vars-in-fn : fn σ stack -> (σ stack)
   ;; Create a stack frame, allocate space in the frame and heap for all variables in the function 
-  [(alloc-vars fn σ (stk frame ...)) (σ_new (stk frame_new frame ...))
-                                     (where (σ_new frame_new) (alloc-vars-helper fn σ (frm)))])
+  [(alloc-vars-in-fn fn σ (stk frame ...)) (σ_new (stk frame_new frame ...))
+                                     (where (σ_new frame_new) (alloc-vars-in-fn-helper fn σ (frm)))])
 
 (define-metafunction mir-machine
-  alloc-vars-helper : fn σ frame -> (σ frame)
+  alloc-vars-in-fn-helper : fn σ frame -> (σ frame)
   ;; Allocate space in the frame and heap for all variables in the function 
   ;; No bbs
-  [(alloc-vars-helper (g (x ...) (let-bbs ()) idx) σ frame) (σ frame)]
+  [(alloc-vars-in-fn-helper (g (x ...) (let-bbs ()) idx) σ frame) (σ frame)]
   ;; Traverse bbs 
-  [(alloc-vars-helper (g (x ...) (let-bbs (blk_0 blk_1 ...)) idx) σ_old frame_old)
-   (alloc-vars-helper (g (x ...) (let-bbs (blk_1 ...)) idx) σ_new frame_new)
-   (where (σ_new frame_new) (alloc-vars-bb blk_0 σ_old frame_old))])
+  [(alloc-vars-in-fn-helper (g (x ...) (let-bbs (blk_0 blk_1 ...)) idx) σ_old frame_old)
+   (alloc-vars-in-fn-helper (g (x ...) (let-bbs (blk_1 ...)) idx) σ_new frame_new)
+   (where (σ_new frame_new) (alloc-vars-in-bb blk_0 σ_old frame_old))])
 
 (define-metafunction mir-machine
-  alloc-vars-bb : blk σ frame -> (σ frame)
+  alloc-vars-in-bb : blk σ frame -> (σ frame)
   ;; Allocate space in the stack frame and the heap for all variables in the block 
-  [(alloc-vars-bb (bb idx (let-vars ()) terminator) σ frame) (σ frame)]
-  [(alloc-vars-bb (bb idx (let-vars ([= lv_0 rv_0] [= lv_1 rv_1] ...)) terminator) σ frame)
-   (alloc-vars-bb (bb idx (let-vars ([= lv_1 rv_1] ...)) terminator) σ_new frame_new)
-   (where (σ_new frame_new) (alloc-vars-bb-helper lv_0 σ frame))])
+  [(alloc-vars-in-bb (bb idx (let-vars ()) terminator) σ frame) (σ frame)]
+  [(alloc-vars-in-bb (bb idx (let-vars ([= lv_0 rv_0] [= lv_1 rv_1] ...)) terminator) σ frame)
+   (alloc-vars-in-bb (bb idx (let-vars ([= lv_1 rv_1] ...)) terminator) σ_new frame_new)
+   (where (σ_new frame_new) (alloc-var lv_0 σ frame))])
 
 (define-metafunction mir-machine
-  alloc-vars-bb-helper : lv σ frame -> (σ frame)
+  alloc-var : lv σ frame -> (σ frame)
   ;; Allocate space for this variable if necessary
   ;; x_0 has already been allocated, return 
-  [(alloc-vars-bb-helper x_0 σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...)) (σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))]
-  [(alloc-vars-bb-helper x_0 σ (frm (x α) ...))
+  [(alloc-var x_0 σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...)) (σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))]
+  [(alloc-var x_0 σ (frm (x α) ...))
    (σ_new (frm (x_0 α_new) (x α) ...))
    (where (σ_new α_new) (malloc σ))]
   ;; FIXME handle projected and dereferenced lvalues
