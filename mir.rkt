@@ -150,7 +150,8 @@
      (use E)
      (binop E rv)
      (binop const E)
-     (unop E)))
+     (unop E)
+     (const ... E rv ...)))
 
 (define run
   (reduction-relation
@@ -180,6 +181,9 @@
    (--> (prog (in-hole E (= α v)) σ ρ stack)
         (prog (in-hole E void) (store-update-direct σ α v) ρ stack)
         "store-update-direct")
+   (--> (prog (in-hole E (= x (const ...))) σ ρ stack)
+        (prog (in-hole E void) (store-update σ stack x (const ...)) ρ stack)
+        "store-update-aggregate-var")
    ;; Lvalues 
    (--> (prog (in-hole E (* x)) σ ρ stack)
         (prog (in-hole E (deref σ stack x)) σ ρ stack)
