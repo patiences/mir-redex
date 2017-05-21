@@ -299,24 +299,32 @@
 
 ;; alloc-var : lv σ frame -> (σ frame)
 ;; =========================================================
-(define alloc_new (term (alloc-var new_variable ,MT-STORE ,MT-FRM)))
+(define alloc_new (term (alloc-var new_variable (1 i32) ,MT-STORE ,MT-FRM)))
 (test-equal (term (is-allocated new_variable ,(car alloc_new) ,(cadr alloc_new))) #t)
 
 ; variable already exists, don't allocate
-(define do_not_alloc_new (term (alloc-var old_variable (store (,a1 void)) (frm (old_variable ,a1)))))
+(define do_not_alloc_new (term (alloc-var old_variable (1 i32) (store (,a1 void)) (frm (old_variable ,a1)))))
 (test-equal do_not_alloc_new
             (term ((store (,a1 void)) (frm (old_variable ,a1)))))
 (test-equal (term (is-allocated old_variable ,(car do_not_alloc_new) ,(cadr do_not_alloc_new))) #t)
 
+; allocate enough space for a tuple
+(define alloc_tuple (term (alloc-var my_tuple ((1 i32) (2 i32)) ,MT-STORE ,MT-FRM)))
+(define new_store_with_tuple (car alloc_tuple))
+(define new_frame_with_tuple (cadr alloc_tuple))
+(test-equal (term (is-allocated my_tuple ,new_store_with_tuple ,new_frame_with_tuple)) #t)
+(test-equal (term (list-length ,new_store_with_tuple)) 3)
+(test-equal (term (list-length ,new_frame_with_tuple)) 1)
+
 ;; malloc : σ -> (σ α)
 ;; =========================================================
-(define malloc_once (term (malloc ,MT-STORE)))
-(define store_1 (car malloc_once))
+(define malloc_one (term (malloc ,MT-STORE 1)))
+(define store_1 (car malloc_one))
 (test-equal (term (list-length ,store_1)) 1)
 
-(define malloc_twice (term (malloc ,store_1)))
-(define store_2 (car malloc_twice))
-(test-equal (term (list-length ,store_2)) 2)
+(define malloc_three_more (term (malloc ,store_1 3)))
+(define store_2 (car malloc_three_more))
+(test-equal (term (list-length ,store_2)) 4)
 
 ;; is-allocated : x σ frame -> boolean
 ;; =========================================================

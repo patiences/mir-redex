@@ -268,7 +268,7 @@
   alloc-vars-in-fn : fn σ stack -> (σ stack)
   ;; Create a stack frame, allocate space in the frame and heap for all variables in the function 
   [(alloc-vars-in-fn fn σ (stk frame ...)) (σ_new (stk frame_new frame ...))
-                                     (where (σ_new frame_new) (alloc-vars-in-fn-helper fn σ (frm)))])
+                                           (where (σ_new frame_new) (alloc-vars-in-fn-helper fn σ (frm)))])
 
 (define-metafunction mir-machine
   alloc-vars-in-fn-helper : fn σ frame -> (σ frame)
@@ -286,33 +286,44 @@
   [(alloc-vars-in-bb (bb idx (let-vars ()) terminator) σ frame) (σ frame)]
   [(alloc-vars-in-bb (bb idx (let-vars ([= lv_0 rv_0] [= lv_1 rv_1] ...)) terminator) σ frame)
    (alloc-vars-in-bb (bb idx (let-vars ([= lv_1 rv_1] ...)) terminator) σ_new frame_new)
-   (where (σ_new frame_new) (alloc-var lv_0 σ frame))])
+   (where (σ_new frame_new) (alloc-var lv_0 rv_0 σ frame))])
 
 ;; This function assumes we never have projections/derefs on the left
 ;; side of the assignment (which I haven't seen yet and seems to make
 ;; sense). 
 (define-metafunction mir-machine
-  alloc-var : lv σ frame -> (σ frame)
-  ;; Allocate space for this variable if necessary
-  ;; x_0 has already been allocated, return 
-  [(alloc-var x_0 σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...)) (σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))]
-  [(alloc-var x_0 σ (frm (x α) ...))
+  alloc-var : lv rv σ frame -> (σ frame)
+  ;; Allocate the necessary space for this variable if necessary
+  [(alloc-var x_0 rv_0 σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...)) ;; already been allocated
+   (σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))]
+  [(alloc-var x_base (operand ...) σ (frm (x α) ...)) ;; allocate enough space for aggregate value
+   (σ_newer (frm (x_base α_base) (x α) ...))           ;; add the base pointer to the frame
+   (where (σ_new (α_base α_1 ...)) (malloc σ ,(+ 2 (term (list-length (operand ...)))))) ;; count the first item, plus a pointer for the entire value
+   (where σ_newer (store-update-direct σ_new α_base (α_1 ...)))] ;; store pointers to memory locations of inner contents
+  ;; TODO: handle allocation for structs
+  [(alloc-var x_0 rv_0 σ (frm (x α) ...)) ;; allocate one space for a single value 
    (σ_new (frm (x_0 α_new) (x α) ...))
-   (where (σ_new α_new) (malloc σ))])
+   (where (σ_new (α_new)) (malloc σ 1))])
 
 (define-metafunction mir-machine
-  malloc : σ -> (σ α)
-  ;; Allocate a space in the heap and return the address
-  [(malloc (store (α v) ...))
-   ((store (α_new void) (α v) ...) α_new)
+  malloc : σ n -> (σ (α ...))
+  ;; Allocate n spaces in the heap and return the new addresses
+  [(malloc σ n) (malloc-helper σ n ())])
+
+(define-metafunction mir-machine
+  malloc-helper : σ n (α ...) -> (σ (α ...))
+  ;; Allocate n spaces in the heap, adding each address to the accumulator
+  [(malloc-helper σ 0 (α ...)) (σ (α ...))]
+  [(malloc-helper (store (α v) ...) n (α_0 ...))
+   (malloc-helper (store (α v) ... (α_new void)) ,(sub1 (term n)) (α_0 ... α_new))
    (where α_new (ptr ,(gensym)))])
 
 (define-metafunction mir-machine
   is-allocated : x σ frame -> boolean
   ;; Returns true if x has been allocated in the heap and stack frame
   [(is-allocated x_0
-                 (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...)
-                 (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))
+                 (store (α_11 v_11) ... (α_0 v_0) (α_12 v_12) ...) ;FIXME got to be a cleaner way to express this
+                 (frm (x_21 α_21) ... (x_0 α_0) (x_22 α_22) ...))
    #t]
   [(is-allocated x σ frame) #f])
 
