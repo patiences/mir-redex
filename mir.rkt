@@ -234,8 +234,8 @@
 (define-metafunction mir-machine
   store-lookup : σ α -> v
   ;; Returns the value mapped to the address α in the store 
-  [(store-lookup (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...) α_0) v_0]
-  [(store-lookup (store (α_1 v_1) ...) α) ,(error "store-lookup: address not found in store:" (term α))])
+  [(store-lookup (store _ ... (α_0 v_0) _ ...) α_0) v_0]
+  [(store-lookup σ α) ,(error "store-lookup: address not found in store:" (term α))])
 
 (define-metafunction mir-machine
   store-update : σ stack x v -> σ
@@ -244,14 +244,14 @@
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
    (where frame (list-ref stack 1))
    (where α_0 (frm-lookup frame x_0))]
-  [(store-update (store (α_1 v_1) ...) stack x v) ,(error "store-update: address not found in store:" (term x))])
+  [(store-update σ stack x v) ,(error "store-update: address not found in store:" (term x))])
 
 (define-metafunction mir-machine
   store-update-direct : σ α v -> σ
   ;; Updates the value at the address in the store
   [(store-update-direct (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)]
-  [(store-update-direct (store (α_1 v_1) ...) α v) ,(error "store-update-direct: address not found in store:" (term α))])
+  [(store-update-direct σ α v) ,(error "store-update-direct: address not found in store:" (term α))])
 
 (define-metafunction mir-machine
   store-update-aggregate : σ stack x (v ...) -> σ
@@ -274,14 +274,14 @@
 (define-metafunction mir-machine
   frm-lookup : frame x -> α
   ;; Returns the address mapped to the variable x in the frame 
-  [(frm-lookup (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...) x_0) α_0]
-  [(frm-lookup (frm (x_1 α_1) ...) x) ,(error "frm-lookup: variable not found in frame:" (term x))])
+  [(frm-lookup (frm _ ... (x_0 α_0) _ ...) x_0) α_0]
+  [(frm-lookup frame x) ,(error "frm-lookup: variable not found in frame:" (term x))])
 
 (define-metafunction mir-machine
   env-lookup : ρ x -> α
   ;; Returns the address mapped to the variable x in the env 
-  [(env-lookup (env (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...) x_0) α_0]
-  [(env-lookup (env (x_1 α_1) ...) x) ,(error "env-lookup: variable not found in environment:" (term x))])
+  [(env-lookup (env _ ... (x_0 α_0) _ ...) x_0) α_0]
+  [(env-lookup ρ x) ,(error "env-lookup: variable not found in environment:" (term x))])
 
 (define-metafunction mir-machine
   alloc-vars-in-fn : fn σ stack -> (σ stack)
@@ -341,8 +341,8 @@
   is-allocated : x σ frame -> boolean
   ;; Returns true if x has been allocated in the heap and stack frame
   [(is-allocated x_0
-                 (store (α_11 v_11) ... (α_0 v_0) (α_12 v_12) ...) ;FIXME got to be a cleaner way to express this
-                 (frm (x_21 α_21) ... (x_0 α_0) (x_22 α_22) ...))
+                 (store _ ... (α_0 v_0) _ ...) 
+                 (frm _ ... (x_0 α_0) _ ...))
    #t]
   [(is-allocated x σ frame) #f])
 
@@ -408,7 +408,7 @@
 (define-metafunction mir-machine
   lookup-fn : prog g -> fn
   ;; Find the function with the given name
-  [(lookup-fn ((g_1 (x_1 ...) bbs_1 idx_1) ... (g_0 (x_0 ...) bbs_0 idx_0) (g_2 (x_2 ...) bbs_2 idx_2) ...) g_0)
+  [(lookup-fn (_ ... (g_0 (x_0 ...) bbs_0 idx_0) _ ...) g_0)
    (g_0 (x_0 ...) bbs_0 idx_0)]
   [(lookup-fn prog g) ,(error "lookup-fn: function with name not found:" (term g))])
 
