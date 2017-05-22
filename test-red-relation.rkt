@@ -19,7 +19,7 @@
 
 (define PROG1 (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
                                                          [= y (use x)]
-                                                         ))
+                                                         [= z ((100 i32) (200 i32) (300 i32))]))
                                             return]))
                            0])))
 (check-not-false (redex-match mir-machine prog PROG0))
@@ -80,10 +80,16 @@
             (term (,PROG0 void ,MT-STORE ,MT-ENV (stk (frm)))))
   
   (define result_1 (car (apply-reduction-relation* run PROG1))) ; unwrap outer list
-  (test-equal (term (list-length (get-stack ,result_1))) 1) ;; 1 frame created
-  (test-equal (term (list-length (list-ref (get-stack ,result_1) 1))) 2) ;; 2 variables in the frame
-  (test-equal (term (list-length (get-store ,result_1))) 2) ;; 2 block of memory allocated
-
+  (define stack_1 (term (get-stack ,result_1)))
+  (define frame_1 (term (list-ref ,stack_1 1)))
+  (define store_1 (term (get-store ,result_1)))
+  (test-equal (term (list-length ,stack_1)) 1) ;; 1 frame created
+  (test-equal (term (list-length ,frame_1)) 3) ;; 2 variables in the frame
+  (test-equal (term (list-length ,store_1)) 6) ;; 2 + (1 + 3) blocks of memory allocated
+  (test-equal (term (is-allocated x ,store_1 ,frame_1)) #t)
+  (test-equal (term (is-allocated y ,store_1 ,frame_1)) #t)
+  (test-equal (term (is-allocated z ,store_1 ,frame_1)) #t)
+  
   (test-results))
 
 (define (bb-eval-tests)
@@ -224,6 +230,23 @@
 (check-exn exn:fail? (λ () (term (store-lookup (store) 1))) "store-lookup: address not found in store: 1")
 (check-exn exn:fail? (λ () (term (store-lookup ,STORE0 (gensym)))) "store-lookup: address not found in store: 0")
 (test-equal (term (store-lookup ,STORE0 ,a2)) (term (5 i32)))
+
+;; store-update-aggregate : σ stack α (v ...) -> σ
+;; =========================================================
+(define STORE-WITH-AGGREGATE-VALUE (term (store [,a0 (,a1 ,a2 ,a3)]
+                                                [,a1 void]
+                                                [,a2 void]
+                                                [,a3 void])))
+(define FRAME-WITH-AGGREGATE-VALUE (term (frm [x ,a0])))
+(check-not-false (redex-match mir-machine σ STORE-WITH-AGGREGATE-VALUE))
+(check-not-false (redex-match mir-machine frame FRAME-WITH-AGGREGATE-VALUE))
+
+(test-equal (term (store-update-aggregate ,STORE-WITH-AGGREGATE-VALUE (stk ,FRAME-WITH-AGGREGATE-VALUE)
+                                          x ((1 i32) (2 i32) (3 i32))))
+            (term (store [,a0 (,a1 ,a2 ,a3)]
+                         [,a1 (1 i32)]
+                         [,a2 (2 i32)]
+                         [,a3 (3 i32)])))
 
 ;; list-ref : any idx -> any
 ;; =========================================================

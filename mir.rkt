@@ -46,7 +46,6 @@
               ;;    idx: index of block to branch to, if rv evals to true
               ;;    msg: error message, if rv evals to false
               (assert operand boolean idx idx msg);; as above, with extra unwinding label 
-              ;; TODO: Consider removing: calls are just an assignment + a goto. 
               (call lv g rvs idx)                 ;; lv gets the result of calling g(rvs), branch to l on return  
               (call lv g rvs idx idx)             ;; as above, with extra unwinding label  
               (goto idx)                          ;; goto l
@@ -181,9 +180,11 @@
    (--> (prog (in-hole E (= α v)) σ ρ stack)
         (prog (in-hole E void) (store-update-direct σ α v) ρ stack)
         "store-update-direct")
-   (--> (prog (in-hole E (= x (const ...))) σ ρ stack)
-        (prog (in-hole E void) (store-update σ stack x (const ...)) ρ stack)
-        "store-update-aggregate-var")
+   ;; FIXME for now this will work for numbers (which are vs and also consts)
+   ;; But this reduction relation should really work on consts (same as above)
+   (--> (prog (in-hole E (= x (v ...))) σ ρ stack) 
+        (prog (in-hole E void) (store-update-aggregate σ stack x (v ...)) ρ stack)
+        "store-update-aggregate")
    ;; Lvalues 
    (--> (prog (in-hole E (* x)) σ ρ stack)
         (prog (in-hole E (deref σ stack x)) σ ρ stack)
@@ -251,6 +252,24 @@
   [(store-update-direct (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) α_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)]
   [(store-update-direct (store (α_1 v_1) ...) α v) ,(error "store-update-direct: address not found in store:" (term α))])
+
+(define-metafunction mir-machine
+  store-update-aggregate : σ stack x (v ...) -> σ
+  ;; Updates the aggregate value at the address in the store
+  [(store-update-aggregate σ stack x_0 (v_1 ...))
+   (store-update-aggregate-helper σ (α_1 ...) (v_1 ...))
+   (where frame (list-ref stack 1))
+   (where α_0 (frm-lookup frame x_0))
+   (where (α_1 ...) (store-lookup σ α_0))])
+
+(define-metafunction mir-machine
+  store-update-aggregate-helper : σ (α ...) (v ...) -> σ
+  ;; Updates the aggregate value that has inner values at the given addresses
+  [(store-update-aggregate-helper σ () ()) σ]
+  [(store-update-aggregate-helper σ (α_1 α_2 ...) (v_1 v_2 ...))
+   (store-update-aggregate-helper σ_new (α_2 ...) (v_2 ...))
+   (where σ_new (store-update-direct σ α_1 v_1))]
+  [(store-update-aggregate-helper σ (α ...) (v ...)) ,(error "store-update-aggregate-helper: addresses and values don't match")])
 
 (define-metafunction mir-machine
   frm-lookup : frame x -> α
