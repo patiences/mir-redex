@@ -171,9 +171,15 @@
    (--> (prog (in-hole E (bb idx void return)) σ ρ stack)
         (prog (in-hole E void) σ ρ stack)
         "ret")
+   (--> (prog (in-hole E (bb idx void (goto idx_next))) σ ρ stack)
+        ;; for some reason this doesn't work if I pull it out into a where 
+        (prog (in-hole E (lookup-bb (get-bbs (get-current-fn (get-current-frame stack))) idx_next))
+              σ ρ stack)
+        "goto")
    ;; Variable assignments
    (--> (prog (in-hole E (let-vars (void ...))) σ ρ stack)
-        (prog (in-hole E void) σ ρ stack))
+        (prog (in-hole E void) σ ρ stack)
+        "done-allocation")
    (--> (prog (in-hole E (= x v)) σ ρ stack)
         (prog (in-hole E void) (store-update σ stack x v) ρ stack)
         "store-update-var")
@@ -443,3 +449,18 @@
   get-frame-contents : frame -> ([x α] ...)
   ;; Get the mappings in the frame
   [(get-frame-contents (frm fn ([x α] ...))) ([x α] ...)])
+
+(define-metafunction mir-machine
+  get-current-frame : stack -> frame
+  ;; Get the first frame in the stack
+  [(get-current-frame (stk frame_0 frame_1 ...)) frame_0])
+
+(define-metafunction mir-machine
+  get-current-fn : frame -> fn
+  ;; Get the function from the frame
+  [(get-current-fn (frm fn _)) fn])
+
+(define-metafunction mir-machine
+  get-bbs : fn -> bbs
+  ;; Get the basic blocks in this function
+  [(get-bbs (g (x_!_ ...) bbs idx)) bbs])

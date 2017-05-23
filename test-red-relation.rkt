@@ -104,13 +104,13 @@
   (test-equal (term (is-allocated y ,store_1 ,frame_1)) #t)
   (test-equal (term (is-allocated z ,store_1 ,frame_1)) #t)
   
-  ;  (define result_2 (car (apply-reduction-relation* run PROG2)))
-  ;  (define stack_2 (term (get-stack ,result_2)))
-  ;  (define frame_2 (term (list-ref ,stack_2 1)))
-  ;  (define store_2 (term (get-store ,result_2)))
-  ;  (test-equal (term (size ,stack_2)) 1)
-  ;  (test-equal (term (size ,frame_2)) 5)
-  ;  
+  (define result_2 (car (apply-reduction-relation* run PROG2)))
+  (define stack_2 (term (get-stack ,result_2)))
+  (define frame_2 (term (list-ref ,stack_2 1)))
+  (define store_2 (term (get-store ,result_2)))
+  (test-equal (term (size ,stack_2)) 1)
+  (test-equal (term (size ,frame_2)) 5)
+  
   (test-results))
 
 (define (bb-eval-tests)
