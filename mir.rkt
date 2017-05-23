@@ -120,8 +120,8 @@
   (α (ptr variable-not-otherwise-mentioned))
   ;; the store, addresses mapped to variables 
   (σ (store (α v) ...))
-  ;; the global stack, with the first being the current frame 
-  (stack (stk frame ...))
+  ;; the global data stack, with the first being the current frame 
+  (δ (stk frame ...))
   ;; a stack frame, with the function we're in and its local variables mapped to frame values 
   (frame (frm fn ((x α) ...)))
   ;; function call, with parameters 
@@ -133,7 +133,7 @@
      (α_0 α_1 ...))                    ;; aggregate values: keep addresses of contents
   ;; Evaluation contexts
   (E hole
-     (prog E σ ρ stack)
+     (prog E σ ρ δ)
      ;; basic blocks
      (bb idx E terminator)
      ;; variable statements
@@ -160,74 +160,73 @@
         (prog (callfn main ()) (store) (env) (stk))
         "call main")
    ;; call function 
-   (--> (prog (in-hole E (callfn g (rv ...))) σ ρ stack)
-        (prog (in-hole E (lookup-fn prog g)) σ_new ρ stack_new)
-        (where (σ_new stack_new) (alloc-vars-in-fn (lookup-fn prog g) σ stack))
+   (--> (prog (in-hole E (callfn g (rv ...))) σ ρ δ)
+        (prog (in-hole E (lookup-fn prog g)) σ_new ρ δ_new)
+        (where (σ_new δ_new) (alloc-vars-in-fn (lookup-fn prog g) σ δ))
         "callfn")
-   (--> (prog (in-hole E (g (x ...) bbs idx)) σ ρ stack)
-        (prog (in-hole E (lookup-bb bbs idx)) σ ρ stack)
+   (--> (prog (in-hole E (g (x ...) bbs idx)) σ ρ δ)
+        (prog (in-hole E (lookup-bb bbs idx)) σ ρ δ)
         "run-bb-0")
    ;; basic block control flow
-   (--> (prog (in-hole E (bb idx void return)) σ ρ stack)
-        (prog (in-hole E void) σ ρ stack)
+   (--> (prog (in-hole E (bb idx void return)) σ ρ δ)
+        (prog (in-hole E void) σ ρ δ)
         "ret")
-   (--> (prog (in-hole E (bb idx void (goto idx_next))) σ ρ stack)
+   (--> (prog (in-hole E (bb idx void (goto idx_next))) σ ρ δ)
         ;; for some reason this doesn't work if I pull it out into a where 
-        (prog (in-hole E (lookup-bb (get-bbs (get-current-fn (get-current-frame stack))) idx_next))
-              σ ρ stack)
+        (prog (in-hole E (next-bb δ idx_next)) σ ρ δ)
         "goto")
    ;; Variable assignments
-   (--> (prog (in-hole E (let-vars (void ...))) σ ρ stack)
-        (prog (in-hole E void) σ ρ stack)
+   (--> (prog (in-hole E (let-vars (void ...))) σ ρ δ)
+        (prog (in-hole E void) σ ρ δ)
         "done-allocation")
-   (--> (prog (in-hole E (= x v)) σ ρ stack)
-        (prog (in-hole E void) (store-update σ stack x v) ρ stack)
+   (--> (prog (in-hole E (= x v)) σ ρ δ)
+        (prog (in-hole E void) (store-update σ δ x v) ρ δ)
         "store-update-var")
-   (--> (prog (in-hole E (= α v)) σ ρ stack)
-        (prog (in-hole E void) (store-update-direct σ α v) ρ stack)
+   (--> (prog (in-hole E (= α v)) σ ρ δ)
+        (prog (in-hole E void) (store-update-direct σ α v) ρ δ)
         "store-update-direct")
    ;; FIXME for now this will work for numbers (which are vs and also consts)
    ;; But this reduction relation should really work on consts (same as above)
-   (--> (prog (in-hole E (= x (v ...))) σ ρ stack) 
-        (prog (in-hole E void) (store-update-aggregate σ stack x (v ...)) ρ stack)
+   (--> (prog (in-hole E (= x (v ...))) σ ρ δ) 
+        (prog (in-hole E void) (store-update-aggregate σ δ x (v ...)) ρ δ)
         "store-update-aggregate")
    ;; Lvalues 
-   (--> (prog (in-hole E (* x)) σ ρ stack)
-        (prog (in-hole E (deref σ stack x)) σ ρ stack)
+   (--> (prog (in-hole E (* x)) σ ρ δ)
+        (prog (in-hole E (deref σ δ x)) σ ρ δ)
         "deref")
-   (--> (prog (in-hole E (· x f)) σ ρ stack)
-        (prog (in-hole E (deref-projection σ stack x f)) σ ρ stack)
+   (--> (prog (in-hole E (· x f)) σ ρ δ)
+        (prog (in-hole E (deref-projection σ δ x f)) σ ρ δ)
         "deref-projection")
    ;; Rvalues 
-   (--> (prog (in-hole E (use x_0)) σ ρ stack) 
-        (prog (in-hole E (deref σ stack x_0)) σ ρ stack)
+   (--> (prog (in-hole E (use x_0)) σ ρ δ) 
+        (prog (in-hole E (deref σ δ x_0)) σ ρ δ)
         "use")
-   (--> (prog (in-hole E (& borrowkind x_0)) σ ρ stack)
+   (--> (prog (in-hole E (& borrowkind x_0)) σ ρ δ)
         ; assuming x_0 is in the current stack frame
-        (prog (in-hole E (frm-lookup (list-ref stack 1) x_0)) σ ρ stack) 
+        (prog (in-hole E (frm-lookup (list-ref δ 1) x_0)) σ ρ δ) 
         "ref")
-   (--> (prog (in-hole E (binop const_1 const_2)) σ ρ stack)
-        (prog (in-hole E (eval-binop binop const_1 const_2)) σ ρ stack)
+   (--> (prog (in-hole E (binop const_1 const_2)) σ ρ δ)
+        (prog (in-hole E (eval-binop binop const_1 const_2)) σ ρ δ)
         "binop")
-   (--> (prog (in-hole E (unop const)) σ ρ stack)
-        (prog (in-hole E (eval-unop unop const)) σ ρ stack)
+   (--> (prog (in-hole E (unop const)) σ ρ δ)
+        (prog (in-hole E (eval-unop unop const)) σ ρ δ)
         "unop")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Metafunctions 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (define-metafunction mir-machine
-  deref : σ stack x -> v
+  deref : σ δ x -> v
   ;; Returns the value mapped to this variable in the store 
-  [(deref σ stack x) (store-lookup σ α)
-                     (where frame (list-ref stack 1)) ; look in the first frame 
+  [(deref σ δ x) (store-lookup σ α)
+                     (where frame (list-ref δ 1)) ; look in the first frame 
                      (where α (frm-lookup frame x))])
 
 (define-metafunction mir-machine
-  deref-projection : σ stack x f -> v
+  deref-projection : σ δ x f -> v
   ;; Dereferences a projected value
-  [(deref-projection σ stack x f) (store-lookup σ α_projected)                        
-                                  (where (α_0 ...) (deref σ stack x))
+  [(deref-projection σ δ x f) (store-lookup σ α_projected)                        
+                                  (where (α_0 ...) (deref σ δ x))
                                   (where α_projected (list-ref (α_0 ...) f))])
 
 (define-metafunction mir-machine
@@ -244,13 +243,13 @@
   [(store-lookup σ α) ,(error "store-lookup: address not found in store:" (term α))])
 
 (define-metafunction mir-machine
-  store-update : σ stack x v -> σ
+  store-update : σ δ x v -> σ
   ;; Updates the value mapped to this variable in the heap
-  [(store-update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) stack x_0 v_new)
+  [(store-update (store (α_1 v_1) ... (α_0 v_old) (α_2 v_2) ...) δ x_0 v_new)
    (store (α_1 v_1) ... (α_0 v_new) (α_2 v_2) ...)
-   (where frame (list-ref stack 1))
+   (where frame (list-ref δ 1))
    (where α_0 (frm-lookup frame x_0))]
-  [(store-update σ stack x v) ,(error "store-update: address not found in store:" (term x))])
+  [(store-update σ δ x v) ,(error "store-update: address not found in store:" (term x))])
 
 (define-metafunction mir-machine
   store-update-direct : σ α v -> σ
@@ -260,11 +259,11 @@
   [(store-update-direct σ α v) ,(error "store-update-direct: address not found in store:" (term α))])
 
 (define-metafunction mir-machine
-  store-update-aggregate : σ stack x (v ...) -> σ
+  store-update-aggregate : σ δ x (v ...) -> σ
   ;; Updates the aggregate value at the address in the store
-  [(store-update-aggregate σ stack x_0 (v_1 ...))
+  [(store-update-aggregate σ δ x_0 (v_1 ...))
    (store-update-aggregate-helper σ (α_1 ...) (v_1 ...))
-   (where frame (list-ref stack 1))
+   (where frame (list-ref δ 1))
    (where α_0 (frm-lookup frame x_0))
    (where (α_1 ...) (store-lookup σ α_0))])
 
@@ -290,7 +289,7 @@
   [(env-lookup ρ x) ,(error "env-lookup: variable not found in environment:" (term x))])
 
 (define-metafunction mir-machine
-  alloc-vars-in-fn : fn σ stack -> (σ stack)
+  alloc-vars-in-fn : fn σ δ -> (σ δ)
   ;; Create a stack frame, allocate space in the frame and heap for all variables in the function 
   [(alloc-vars-in-fn fn σ (stk frame ...)) (σ_new (stk frame_new frame ...))
                                            (where (σ_new frame_new) (alloc-vars-in-fn-helper fn σ (frm fn ())))])
@@ -436,14 +435,14 @@
   [(list-length (any_0 any_1 ...)) ,(add1 (term (list-length (any_1 ...))))])
 
 (define-metafunction mir-machine
-  get-stack : (prog v σ ρ stack) -> stack
+  get-stack : (prog v σ ρ δ) -> δ
   ;; Get the stack from the result of a reduction 
-  [(get-stack (prog v σ ρ stack)) stack])
+  [(get-stack (prog v σ ρ δ)) δ])
 
 (define-metafunction mir-machine
-  get-store : (prog v σ ρ stack) -> σ
+  get-store : (prog v σ ρ δ) -> σ
   ;; Get the store from the result of a reduction
-  [(get-store (prog v σ ρ stack)) σ])
+  [(get-store (prog v σ ρ δ)) σ])
 
 (define-metafunction mir-machine
   get-frame-contents : frame -> ([x α] ...)
@@ -451,7 +450,7 @@
   [(get-frame-contents (frm fn ([x α] ...))) ([x α] ...)])
 
 (define-metafunction mir-machine
-  get-current-frame : stack -> frame
+  get-current-frame : δ -> frame
   ;; Get the first frame in the stack
   [(get-current-frame (stk frame_0 frame_1 ...)) frame_0])
 
@@ -464,3 +463,8 @@
   get-bbs : fn -> bbs
   ;; Get the basic blocks in this function
   [(get-bbs (g (x_!_ ...) bbs idx)) bbs])
+
+(define-metafunction mir-machine
+  next-bb : δ idx -> blk
+  ;; Get the basic block inside the current function with the specified index 
+  [(next-bb δ idx_next) (lookup-bb (get-bbs (get-current-fn (get-current-frame δ))) idx_next)])

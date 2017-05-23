@@ -79,8 +79,8 @@
 (define MT-STK (term (stk)))
 (define STK0-ALLOC-ONLY (term (stk ,FRM0-ALLOC-ONLY)))
 (define STK0 (term (stk ,FRM0)))
-(check-not-false (redex-match mir-machine stack STK0-ALLOC-ONLY))
-(check-not-false (redex-match mir-machine stack STK0))
+(check-not-false (redex-match mir-machine δ STK0-ALLOC-ONLY))
+(check-not-false (redex-match mir-machine δ STK0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
 ;; Reduction tests 
@@ -252,7 +252,7 @@
 (check-exn exn:fail? (λ () (term (store-lookup ,STORE0 (gensym)))) "store-lookup: address not found in store: 0")
 (test-equal (term (store-lookup ,STORE0 ,a2)) (term (5 i32)))
 
-;; store-update-aggregate : σ stack α (v ...) -> σ
+;; store-update-aggregate : σ δ α (v ...) -> σ
 ;; =========================================================
 (define STORE-WITH-AGGREGATE-VALUE (term (store [,a0 (,a1 ,a2 ,a3)]
                                                 [,a1 void]
@@ -291,7 +291,7 @@
 (test-equal (term (lookup-fn ,PROG0 main)) MT-MAIN)
 (check-exn exn:fail? (λ () (term (lookup-fn () main))) "lookup-fn: function with name not found: main")
 
-;; alloc-vars-in-fn : fn σ stack -> (σ stack)
+;; alloc-vars-in-fn : fn σ δ -> (σ δ)
 ;; =========================================================
 (define alloc_vars (term (alloc-vars-in-fn (main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) return]
                                                               [bb 1 (let-vars ([= foo (6 u64)]
