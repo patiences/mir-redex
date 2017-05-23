@@ -97,9 +97,9 @@
   (define stack_1 (term (get-stack ,result_1)))
   (define frame_1 (term (list-ref ,stack_1 1)))
   (define store_1 (term (get-store ,result_1)))
-  (test-equal (term (list-length ,stack_1)) 1) ;; 1 frame created
-  ;(test-equal (term (list-length (cadr ,frame_1))) 3) ;; 3 variables in the frame
-  (test-equal (term (list-length ,store_1)) 6) ;; 2 + (1 + 3) blocks of memory allocated
+  (test-equal (term (size ,stack_1)) 1) ;; 1 frame created
+  (test-equal (term (size ,frame_1)) 3) ;; 3 variables in the frame
+  (test-equal (term (size ,store_1)) 6) ;; 2 + (1 + 3) blocks of memory allocated
   (test-equal (term (is-allocated x ,store_1 ,frame_1)) #t)
   (test-equal (term (is-allocated y ,store_1 ,frame_1)) #t)
   (test-equal (term (is-allocated z ,store_1 ,frame_1)) #t)
@@ -108,8 +108,8 @@
   ;  (define stack_2 (term (get-stack ,result_2)))
   ;  (define frame_2 (term (list-ref ,stack_2 1)))
   ;  (define store_2 (term (get-store ,result_2)))
-  ;  (test-equal (term (list-length ,stack_2)) 1)
-  ;  (test-equal (term (list-length ,frame_2)) 5)
+  ;  (test-equal (term (size ,stack_2)) 1)
+  ;  (test-equal (term (size ,frame_2)) 5)
   ;  
   (test-results))
 
@@ -304,9 +304,9 @@
 (define new_frame (term (list-ref ,new_stack 1)))
 (test-equal (term (is-allocated x ,new_store ,new_frame)) #t)
 (test-equal (term (is-allocated foo ,new_store ,new_frame)) #t)
-(test-equal (term (list-length ,new_stack)) 1)
-(test-equal (term (list-length ,new_frame)) 2)
-(test-equal (term (list-length ,new_store)) 2)
+(test-equal (term (size ,new_stack)) 1)
+(test-equal (term (size ,new_frame)) 2)
+(test-equal (term (size ,new_store)) 2)
 
 ;; alloc-vars-in-fn-helper : fn σ frame -> (σ frame)
 ;; =========================================================
@@ -322,7 +322,7 @@
 (test-equal (term (is-allocated x ,σ_new ,frm_new)) #t)
 (test-equal (term (is-allocated foo ,σ_new ,frm_new)) #t)
 (test-equal (term (is-allocated bar ,σ_new ,frm_new)) #t)
-;(test-equal (term (list-length (cadr ,frm_new))) 3)
+(test-equal (term (size ,frm_new)) 3)
 
 ;; alloc-vars-in-bb : blk σ frame -> (σ frame)
 ;; =========================================================
@@ -357,18 +357,18 @@
 (define new_store_with_tuple (car alloc_tuple))
 (define new_frame_with_tuple (cadr alloc_tuple))
 (test-equal (term (is-allocated my_tuple ,new_store_with_tuple ,new_frame_with_tuple)) #t)
-(test-equal (term (list-length ,new_store_with_tuple)) 3)
-;(test-equal (term (list-length (cadr ,new_frame_with_tuple))) 1)
+(test-equal (term (size ,new_store_with_tuple)) 3)
+(test-equal (term (size ,new_frame_with_tuple)) 1)
 
 ;; malloc : σ -> (σ α)
 ;; =========================================================
 (define malloc_one (term (malloc ,MT-STORE 1)))
 (define store_1 (car malloc_one))
-(test-equal (term (list-length ,store_1)) 1)
+(test-equal (term (size ,store_1)) 1)
 
 (define malloc_three_more (term (malloc ,store_1 3)))
 (define store_2 (car malloc_three_more))
-(test-equal (term (list-length ,store_2)) 4)
+(test-equal (term (size ,store_2)) 4)
 
 ;; is-allocated : x σ frame -> boolean
 ;; =========================================================

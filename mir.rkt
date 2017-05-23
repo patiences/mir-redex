@@ -317,7 +317,7 @@
    (σ (frm fn ((x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...)))]
   [(alloc-var x_base (operand ...) σ (frm fn ((x α) ...))) ;; allocate enough space for aggregate value
    (σ_newer (frm fn ((x_base α_base) (x α) ...)))           ;; add the base pointer to the frame
-   (where (σ_new (α_base α_1 ...)) (malloc σ ,(+ 2 (term (list-length (operand ...)))))) ;; count the first item, plus a pointer for the entire value
+   (where (σ_new (α_base α_1 ...)) (malloc σ ,(+ 1 (term (list-length (operand ...)))))) ;; count the first item, plus a pointer for the entire value
    (where σ_newer (store-update-direct σ_new α_base (α_1 ...)))] ;; store pointers to memory locations of inner contents
   ;; TODO: handle allocation for structs
   [(alloc-var x_0 rv_0 σ (frm fn ((x α) ...))) ;; allocate one space for a single value 
@@ -417,9 +417,16 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define-metafunction mir-machine
+  size : (any ...) -> integer
+  [(size (store any_0 ...)) (list-length (any_0 ...))]
+  [(size (env any_0 ...)) (list-length (any_0 ...))]
+  [(size (frm fn (any_0 ...))) (list-length (any_0 ...))]
+  [(size (stk any_0 ...)) (list-length (any_0 ...))])
+
+(define-metafunction mir-machine
   list-length : (any ...) -> integer
-  ;; Returns the length of a list of the form (list-type element_0 ...)
-  [(list-length (any_0)) 0]
+  ;; Returns the number of elements in the list
+  [(list-length ()) 0]
   [(list-length (any_0 any_1 ...)) ,(add1 (term (list-length (any_1 ...))))])
 
 (define-metafunction mir-machine
@@ -431,3 +438,8 @@
   get-store : (prog v σ ρ stack) -> σ
   ;; Get the store from the result of a reduction
   [(get-store (prog v σ ρ stack)) σ])
+
+(define-metafunction mir-machine
+  get-frame-contents : frame -> ([x α] ...)
+  ;; Get the mappings in the frame
+  [(get-frame-contents (frm fn ([x α] ...))) ([x α] ...)])
