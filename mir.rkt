@@ -122,8 +122,8 @@
   (σ (store (α v) ...))
   ;; the global stack, with the first being the current frame 
   (stack (stk frame ...))
-  ;; a stack frame, local variables mapped to frame values 
-  (frame (frm (x α) ...))
+  ;; a stack frame, with the function we're in and its local variables mapped to frame values 
+  (frame (frm fn ((x α) ...)))
   ;; function call, with parameters 
   (callfn g (rv ...))
   ;; store values 
@@ -274,7 +274,7 @@
 (define-metafunction mir-machine
   frm-lookup : frame x -> α
   ;; Returns the address mapped to the variable x in the frame 
-  [(frm-lookup (frm _ ... (x_0 α_0) _ ...) x_0) α_0]
+  [(frm-lookup (frm fn (_ ... (x_0 α_0) _ ...)) x_0) α_0]
   [(frm-lookup frame x) ,(error "frm-lookup: variable not found in frame:" (term x))])
 
 (define-metafunction mir-machine
@@ -287,7 +287,7 @@
   alloc-vars-in-fn : fn σ stack -> (σ stack)
   ;; Create a stack frame, allocate space in the frame and heap for all variables in the function 
   [(alloc-vars-in-fn fn σ (stk frame ...)) (σ_new (stk frame_new frame ...))
-                                           (where (σ_new frame_new) (alloc-vars-in-fn-helper fn σ (frm)))])
+                                           (where (σ_new frame_new) (alloc-vars-in-fn-helper fn σ (frm fn ())))])
 
 (define-metafunction mir-machine
   alloc-vars-in-fn-helper : fn σ frame -> (σ frame)
@@ -313,15 +313,15 @@
 (define-metafunction mir-machine
   alloc-var : lv rv σ frame -> (σ frame)
   ;; Allocate the necessary space for this variable if necessary
-  [(alloc-var x_0 rv_0 σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...)) ;; already been allocated
-   (σ (frm (x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))]
-  [(alloc-var x_base (operand ...) σ (frm (x α) ...)) ;; allocate enough space for aggregate value
-   (σ_newer (frm (x_base α_base) (x α) ...))           ;; add the base pointer to the frame
+  [(alloc-var x_0 rv_0 σ (frm fn ((x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...))) ;; already been allocated
+   (σ (frm fn ((x_1 α_1) ... (x_0 α_0) (x_2 α_2) ...)))]
+  [(alloc-var x_base (operand ...) σ (frm fn ((x α) ...))) ;; allocate enough space for aggregate value
+   (σ_newer (frm fn ((x_base α_base) (x α) ...)))           ;; add the base pointer to the frame
    (where (σ_new (α_base α_1 ...)) (malloc σ ,(+ 2 (term (list-length (operand ...)))))) ;; count the first item, plus a pointer for the entire value
    (where σ_newer (store-update-direct σ_new α_base (α_1 ...)))] ;; store pointers to memory locations of inner contents
   ;; TODO: handle allocation for structs
-  [(alloc-var x_0 rv_0 σ (frm (x α) ...)) ;; allocate one space for a single value 
-   (σ_new (frm (x_0 α_new) (x α) ...))
+  [(alloc-var x_0 rv_0 σ (frm fn ((x α) ...))) ;; allocate one space for a single value 
+   (σ_new (frm fn ((x_0 α_new) (x α) ...)))
    (where (σ_new (α_new)) (malloc σ 1))])
 
 (define-metafunction mir-machine
@@ -342,7 +342,7 @@
   ;; Returns true if x has been allocated in the heap and stack frame
   [(is-allocated x_0
                  (store _ ... (α_0 v_0) _ ...) 
-                 (frm _ ... (x_0 α_0) _ ...))
+                 (frm fn (_ ... (x_0 α_0) _ ...)))
    #t]
   [(is-allocated x σ frame) #f])
 
