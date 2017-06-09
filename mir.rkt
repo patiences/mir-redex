@@ -38,7 +38,7 @@
   ;; terminator
   (terminator return                              ;; return to caller
               resume                              ;; emitted by diverge call during unwinding 
-              (switchInt lv                       ;; switch on an integer, branching to bb l 
+              (switchInt operand                  ;; switch on an integer, branching to bb l 
                          (const idx) ...
                          (otherwise idx))
               (assert operand boolean idx msg)    ;; checked branch
@@ -107,7 +107,8 @@
   (idx integer)                                   ;; indices 
   (x variable-not-otherwise-mentioned)            ;; variables 
   (f integer)                                     ;; field "names"
-  (g variable-not-otherwise-mentioned))           ;; function names
+  (g variable-not-otherwise-mentioned)            ;; function names
+  (s variable-not-otherwise-mentioned))           ;; struct names
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Evaluation
@@ -137,6 +138,7 @@
      (prog E σ ρ δ)
      ;; basic blocks
      (bb idx E terminator)
+     (bb idx void (switchInt E (const idx_1) ... (otherwise idx_2)))
      ;; variable statements
      (let-vars E)
      (void ... E (= lv rv) ...)
@@ -175,7 +177,11 @@
         "ret")
    (--> (prog (in-call fn (in-hole E (bb idx void (goto idx_next)))) σ ρ δ)
         (prog (in-call fn (in-hole E (next-bb fn idx_next))) σ ρ δ)
-        "goto")
+        "goto")        
+   (--> (prog (in-call fn (in-hole E (bb idx void (switchInt const_0 (const_1 idx_1) ... (otherwise idx_2))))) σ ρ δ)
+        (prog (in-call fn (in-hole E (next-bb fn (lookup-next-bb-idx (switchInt const_0 (const_1 idx_1) ... (otherwise idx_2))))))
+              σ ρ δ)
+        "switchInt")
    ;; Variable assignments
    (--> (prog (in-call fn (in-hole E (let-vars (void ...)))) σ ρ δ)
         (prog (in-call fn (in-hole E void)) σ ρ δ)
@@ -428,7 +434,17 @@
   get-return-value : δ σ -> v
   ;; Produce the value mapped to return-ptr (return pointer)
   [(get-return-value δ σ)
-   (store-lookup σ (frm-lookup (get-current-frame δ) return-ptr))]) 
+   (store-lookup σ (frm-lookup (get-current-frame δ) return-ptr))])
+
+(define-metafunction mir-machine
+  lookup-next-bb-idx : (switchInt const (const idx) ... (otherwise idx)) -> idx
+  ;; Produce the index of the next basic block, matching on the operand 
+  [(lookup-next-bb-idx (switchInt const (otherwise idx))) idx]
+  [(lookup-next-bb-idx (switchInt const_0 (const_1 idx_1) (const_2 idx_2) ... (otherwise idx)))
+   idx_1
+   (side-condition (equal? (term const_0) (term const_1)))]
+  [(lookup-next-bb-idx (switchInt const_0 (const_1 idx_1) (const_2 idx_2) ... (otherwise idx)))
+   (lookup-next-bb-idx (switchInt const_0 (const_2 idx_2) ... (otherwise idx)))])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Metafunctions for testing

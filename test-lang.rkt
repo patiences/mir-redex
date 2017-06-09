@@ -59,7 +59,8 @@
 (define struct-creation
   (term (main () (let-bbs ([bb 0 (let-vars
                                   ([= _1 (struct Point ([= x (4 i32)] [= y (5 i32)]))]
-                                   [= _0 unit])) return])) 0)))
+                                   [= _0 unit])) return]))
+              0)))
 
 (check-not-false (redex-match mir fn struct-creation))
 ;; Not function 
@@ -174,13 +175,13 @@
                                                     [= _8 (use _4)]
                                                     [= _9 (use _6)]
                                                     [= _7 (< (use _8) (use _9))]))
-                                       (switchInt _7 ((0 u8) 3) (otherwise 1))]
+                                       (switchInt (use _7) ((0 u8) 3) (otherwise 1))]
                                    [bb 1 (let-vars ([= _0 #t])) (goto 4)]
                                    [bb 2 (let-vars ([= _0 #f])) (goto 4)]
                                    [bb 3 (let-vars ([= _11 (use _6)]
                                                     [= _12 (use _5)]
                                                     [= _10 (< (use _11) (use _12))]))
-                                       (switchInt _10 ((0 u8) 2) (otherwise 1))]
+                                       (switchInt (use _10) ((0 u8) 2) (otherwise 1))]
                                    [bb 4 (let-vars ()) return]))
               0))))
 
@@ -313,7 +314,7 @@
 (define match
   (term (main () (let-bbs ([bb 0 (let-vars ([= _1 (17 i32)]
                                             [= _2 (2 i32)]))
-                               (switchInt _2 ((1 i32) 1) ((2 i32) 2) (otherwise 3))]
+                               (switchInt (use _2) ((1 i32) 1) ((2 i32) 2) (otherwise 3))]
                            [bb 1 (let-vars ([= _3 (111 i32)])) (goto 4)]
                            [bb 2 (let-vars ([= _3 (222 i32)])) (goto 4)]
                            [bb 3 (let-vars ([= _4 (use _1)] [= _5 (>> (use _4) (2 i32))]))

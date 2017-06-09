@@ -17,7 +17,6 @@
 ;; Programs and functions 
 (define MT-MAIN (term [main () (let-bbs ([bb 0 (let-vars ()) return])) 0]))
 (define PROG0 (term (,MT-MAIN)))
-
 (define PROG1 (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
                                                          [= y (use x)]
                                                          [= z ((100 i32) (200 i32) (300 i32))]))
@@ -32,6 +31,25 @@
                                                          [= bar (42 i32)]))
                                             return]))
                            0])))
+(define PROG3a (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
+                                                         [= y (use x)]
+                                                         [= z ((100 i32) (200 i32) (300 i32))]))
+                                            (switchInt (1 i32) ((1 i32) 1) (otherwise 2))]
+                                        [bb 1 (let-vars ([= foo (use x)]
+                                                         [= bar (42 i32)]))
+                                            return]
+                                        [bb 2 (let-vars ()) return]))
+                           0])))
+
+(define PROG3b (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
+                                                         [= y (use x)]
+                                                         [= z ((100 i32) (200 i32) (300 i32))]))
+                                            (switchInt (use (· z 1)) ((1 i32) 1) (otherwise 2))]
+                                        [bb 1 (let-vars ([= foo (use x)]
+                                                         [= bar (42 i32)]))
+                                            return]
+                                        [bb 2 (let-vars ()) return]))
+                           0])))
 
 (check-not-false (redex-match mir-machine prog PROG0))
 (check-not-false (redex-match mir-machine prog PROG1))
@@ -43,7 +61,6 @@
 
 ;; Stores 
 (define MT-STORE (term (store)))
-(define MT-STORE-WITH-RETURN (term (store [,return-address void])))
 (define STORE0-ALLOC-ONLY (term (store [,return-address void]
                                        [,a0 void]
                                        [,a1 void]
@@ -61,7 +78,6 @@
 
 ;; Stack frames 
 (define MT-FRM (term (frm)))
-(define MT-FRM-WITH-RETURN (term (frm [return-ptr ,return-address])))
 (define FRM0-ALLOC-ONLY (term (frm [return-ptr ,return-address]
                                    [a ,a0]
                                    [x ,a1]
@@ -116,6 +132,20 @@
   (define store_2 (term (get-store ,result_2)))
   (test-equal (term (size ,stack_2)) 1)
   (test-equal (term (size ,frame_2)) 6)
+
+  (define result_3a (car (apply-reduction-relation* run PROG3a)))
+  (define stack_3a (term (get-stack ,result_3a)))
+  (define frame_3a (term (list-ref ,stack_3a 1)))
+  (define store_3a (term (get-store ,result_3a)))
+  (test-equal (term (store-lookup ,store_3a (frm-lookup ,frame_3a foo))) (term (1 i32))) ;; block 1 ran 
+  (test-equal (term (store-lookup ,store_3a (frm-lookup ,frame_3a bar))) (term (42 i32)));; block 1 ran
+
+  (define result_3b (car (apply-reduction-relation* run PROG3b)))
+  (define stack_3b (term (get-stack ,result_3b)))
+  (define frame_3b (term (list-ref ,stack_3b 1)))
+  (define store_3b (term (get-store ,result_3b)))
+  (test-equal (term (store-lookup ,store_3b (frm-lookup ,frame_3b foo))) (term void)) ;; block 1 did not run 
+  (test-equal (term (store-lookup ,store_3b (frm-lookup ,frame_3b bar))) (term void)) ;; block 1 did not run
   
   (test-results))
 
@@ -380,6 +410,20 @@
 ;; =========================================================
 (test-equal (term (is-allocated x (store (,a1 void)) (frm [x ,a1]))) #t) 
 (test-equal (term (is-allocated x (store) (frm))) #f)
+
+;; lookup-next-bb-idx : (switchInt const (const idx) ... (otherwise idx)
+;; =========================================================
+(test-equal (term (lookup-next-bb-idx (switchInt (5 i32) ((5 i32) 3) (otherwise 1))))
+            (term 3))
+(test-equal (term (lookup-next-bb-idx (switchInt (6 i32) ((5 i32) 3) (otherwise 1))))
+            (term 1))
+(test-equal (term (lookup-next-bb-idx (switchInt (3 i32)
+                                                 ((1 i32) 1)
+                                                 ((2 i32) 2)
+                                                 ((3 i32) 3)
+                                                 (otherwise 4))))
+            (term 3))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
 ;; Run tests
