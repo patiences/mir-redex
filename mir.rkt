@@ -118,7 +118,7 @@
   (ρ (env (x α) ...))
   ;; addresses
   (α (ptr variable-not-otherwise-mentioned))
-  ;; the store, addresses mapped to variables 
+  ;; the store, addresses mapped to values 
   (σ (store (α v) ...))
   ;; the global data stack, with the first being the current frame 
   (δ (stk frame ...))
@@ -171,7 +171,7 @@
         "run-bb-0")
    ;; basic block control flow
    (--> (prog (in-call fn (in-hole E (bb idx void return))) σ ρ δ)
-        (prog (in-call fn (in-hole E void)) σ ρ δ) ;;FIXME handle return value
+        (prog (get-return-value δ σ) σ ρ δ) 
         "ret")
    (--> (prog (in-call fn (in-hole E (bb idx void (goto idx_next)))) σ ρ δ)
         (prog (in-call fn (in-hole E (next-bb fn idx_next))) σ ρ δ)
@@ -291,9 +291,15 @@
 
 (define-metafunction mir-machine
   alloc-vars-in-fn : fn σ δ -> (σ δ)
-  ;; Create a stack frame, allocate space in the frame and heap for all variables in the function 
-  [(alloc-vars-in-fn fn σ (stk frame ...)) (σ_new (stk frame_new frame ...))
-                                           (where (σ_new frame_new) (alloc-vars-in-fn-helper fn σ (frm)))])
+  ;; Create a stack frame, allocate space in the frame and heap for all variables in the function and a return value
+  [(alloc-vars-in-fn fn σ (stk frame ...)) (σ_withreturn (stk frame_withreturn frame ...))
+                                           (where (σ_new frame_new) (alloc-vars-in-fn-helper fn σ (frm)))
+                                           (where (σ_withreturn frame_withreturn) (alloc-return-value σ_new frame_new))])
+
+(define-metafunction mir-machine
+  alloc-return-value : σ frame -> (σ frame)
+  ;; Allocates a space for the return value in the frame and heap
+  [(alloc-return-value σ frame) (alloc-var return-ptr unit σ frame)])
 
 (define-metafunction mir-machine
   alloc-vars-in-fn-helper : fn σ frame -> (σ frame)
@@ -418,6 +424,12 @@
    (g_0 (x_0 ...) bbs_0 idx_0)]
   [(lookup-fn prog g) ,(error "lookup-fn: function with name not found:" (term g))])
 
+(define-metafunction mir-machine
+  get-return-value : δ σ -> v
+  ;; Produce the value mapped to return-ptr (return pointer)
+  [(get-return-value δ σ)
+   (store-lookup σ (frm-lookup (get-current-frame δ) return-ptr))]) 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Metafunctions for testing
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -459,6 +471,11 @@
   get-bbs : fn -> bbs
   ;; Get the basic blocks in this function
   [(get-bbs (g (x_!_ ...) bbs idx)) bbs])
+
+(define-metafunction mir-machine
+  get-return-value-from-reduction : (prog any σ ρ δ) -> any
+  ;; Get the return value from the result of a reduction
+  [(get-return-value-from-reduction (prog any σ ρ δ)) any])
 
 (define-metafunction mir-machine
   next-bb : fn idx -> blk

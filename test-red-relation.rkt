@@ -6,7 +6,8 @@
 ;; Constants for testing 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Addresses 
+;; Addresses
+(define return-address (term (ptr ,(gensym))))
 (define a0 (term (ptr ,(gensym))))
 (define a1 (term (ptr ,(gensym))))
 (define a2 (term (ptr ,(gensym))))
@@ -42,12 +43,15 @@
 
 ;; Stores 
 (define MT-STORE (term (store)))
-(define STORE0-ALLOC-ONLY (term (store [,a0 void]
+(define MT-STORE-WITH-RETURN (term (store [,return-address void])))
+(define STORE0-ALLOC-ONLY (term (store [,return-address void]
+                                       [,a0 void]
                                        [,a1 void]
                                        [,a2 void]
                                        [,a3 void]
                                        [,a4 void])))
-(define STORE0 (term (store [,a0 void]
+(define STORE0 (term (store [,return-address void]
+                            [,a0 void]
                             [,a1 ,a2]
                             [,a2 (5 i32)]
                             [,a3 void]
@@ -57,13 +61,15 @@
 
 ;; Stack frames 
 (define MT-FRM (term (frm)))
-(define FRM0-ALLOC-ONLY (term (frm [a ,a0]
+(define MT-FRM-WITH-RETURN (term (frm [return-ptr ,return-address])))
+(define FRM0-ALLOC-ONLY (term (frm [return-ptr ,return-address]
+                                   [a ,a0]
                                    [x ,a1]
                                    [y ,a2]
                                    [z ,a3]
                                    [xyz ,a4])))
 (define FRM0 (term (frm
-                    ; dummy function
+                    [return-ptr ,return-address]
                     [a ,a0]
                     [x ,a1]
                     [y ,a2]
@@ -88,17 +94,18 @@
   ;; These tests deal with function call executions. 
   (test--> run PROG0
            (term (,PROG0 (callfn main ()) ,MT-STORE ,MT-ENV ,MT-STK)))
-  (test-->> run PROG0
-            (term (,PROG0 (in-call ,MT-MAIN void)
-                          ,MT-STORE ,MT-ENV (stk (frm)))))
+  
+  (define result_0 (car (apply-reduction-relation* run PROG0)))
+  (define result (term (get-return-value-from-reduction ,result_0)))
+  (test-equal result (term void))
   
   (define result_1 (car (apply-reduction-relation* run PROG1))) ; unwrap outer list
   (define stack_1 (term (get-stack ,result_1)))
   (define frame_1 (term (list-ref ,stack_1 1)))
   (define store_1 (term (get-store ,result_1)))
   (test-equal (term (size ,stack_1)) 1) ;; 1 frame created
-  (test-equal (term (size ,frame_1)) 3) ;; 3 variables in the frame
-  (test-equal (term (size ,store_1)) 6) ;; 2 + (1 + 3) blocks of memory allocated
+  (test-equal (term (size ,frame_1)) 4) ;; 3 variables in the frame + return pointer
+  (test-equal (term (size ,store_1)) 7) ;; 2 + (1 + 3) blocks of memory allocated + return value 
   (test-equal (term (is-allocated x ,store_1 ,frame_1)) #t)
   (test-equal (term (is-allocated y ,store_1 ,frame_1)) #t)
   (test-equal (term (is-allocated z ,store_1 ,frame_1)) #t)
@@ -108,7 +115,7 @@
   (define frame_2 (term (list-ref ,stack_2 1)))
   (define store_2 (term (get-store ,result_2)))
   (test-equal (term (size ,stack_2)) 1)
-  (test-equal (term (size ,frame_2)) 5)
+  (test-equal (term (size ,frame_2)) 6)
   
   (test-results))
 
@@ -120,11 +127,12 @@
     (term (,PROG0 (in-call ,MT-MAIN ,test-exp) ,STORE0-ALLOC-ONLY ,MT-ENV ,STK0-ALLOC-ONLY)))
   
   (define (wrap-result result-exp result-store)
-    (term (,PROG0 (in-call ,MT-MAIN ,result-exp) ,result-store ,MT-ENV ,STK0-ALLOC-ONLY)))
+    (term (,PROG0 ,result-exp ,result-store ,MT-ENV ,STK0-ALLOC-ONLY)))
   
   (test-->> run (wrap-test (term [bb 0 (let-vars ([= a (1 i32)])) return]))
             (wrap-result (term void)
-                         (term (store [,a0 (1 i32)]
+                         (term (store [,return-address void]
+                                      [,a0 (1 i32)]
                                       [,a1 void]
                                       [,a2 void]
                                       [,a3 void]
@@ -142,22 +150,25 @@
     (term (,PROG0 (in-call ,MT-MAIN ,result-exp) ,result-store ,MT-ENV ,STK0-ALLOC-ONLY)))
   
   (test-->> run (wrap-test (term (bb 0 (let-vars [(= a (1 i32))]) return)))
-            (wrap-result (term void)
-                         (term (store [,a0 (1 i32)]
+            (term (,PROG0 void (store [,return-address void]
+                                      [,a0 (1 i32)]
                                       [,a1 void]
                                       [,a2 void]
                                       [,a3 void]
-                                      [,a4 void]))))
+                                      [,a4 void])
+                          ,MT-ENV ,STK0-ALLOC-ONLY)))
   (test-->> run (wrap-test (term (= a (1 i32))))
             (wrap-result (term void)
-                         (term (store [,a0 (1 i32)]
+                         (term (store [,return-address void]
+                                      [,a0 (1 i32)]
                                       [,a1 void]
                                       [,a2 void]
                                       [,a3 void]
                                       [,a4 void]))))
   (test-->> run (wrap-test (term (= a (+ (1 i32) (1 i32)))))
             (wrap-result (term void)
-                         (term (store [,a0 (2 i32)]
+                         (term (store [,return-address void]
+                                      [,a0 (2 i32)]
                                       [,a1 void]
                                       [,a2 void]
                                       [,a3 void]
@@ -174,7 +185,8 @@
   (test-->> run (wrap (term (= (* x) (1 i32))))       ; *x = 1 
             (term (,PROG0
                    (in-call ,MT-MAIN void)
-                   (store [,a0 void]
+                   (store [,return-address void]
+                          [,a0 void]
                           [,a1 ,a2]
                           [,a2 (1 i32)] ; *x
                           [,a3 void]
@@ -184,7 +196,8 @@
                                        [= (* x) (2 i32)]))))
             (term (,PROG0
                    (in-call ,MT-MAIN void)
-                   (store [,a0 (1 i32)]
+                   (store [,return-address void]
+                          [,a0 (1 i32)]
                           [,a1 ,a2]
                           [,a2 (2 i32)] ; *x
                           [,a3 void]
@@ -298,8 +311,8 @@
 (test-equal (term (is-allocated x ,new_store ,new_frame)) #t)
 (test-equal (term (is-allocated foo ,new_store ,new_frame)) #t)
 (test-equal (term (size ,new_stack)) 1)
-(test-equal (term (size ,new_frame)) 2)
-(test-equal (term (size ,new_store)) 2)
+(test-equal (term (size ,new_frame)) 3) ; 2 variables plus return pointer 
+(test-equal (term (size ,new_store)) 3) ; 2 variables plus return value 
 
 ;; alloc-vars-in-fn-helper : fn σ frame -> (σ frame)
 ;; =========================================================
