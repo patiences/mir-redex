@@ -91,7 +91,8 @@
   (test--> run PROG0
            (term (,PROG0 (callfn main ()) ,MT-STORE ,MT-ENV ,MT-STK)))
   (test-->> run PROG0
-            (term (,PROG0 (in-fn ,MT-MAIN void) ,MT-STORE ,MT-ENV (stk (frm ,MT-MAIN ())))))
+            (term (,PROG0 (in-call ,MT-MAIN void)
+                          ,MT-STORE ,MT-ENV (stk (frm ,MT-MAIN ())))))
   
   (define result_1 (car (apply-reduction-relation* run PROG1))) ; unwrap outer list
   (define stack_1 (term (get-stack ,result_1)))
@@ -115,15 +116,21 @@
 
 (define (bb-eval-tests)
   ;; These tests deal with basic block execution and control flow within a function call.
-  (test-->> run (term (,PROG0 [bb 0 (let-vars ([= a (1 i32)])) return] ,STORE0-ALLOC-ONLY ,MT-ENV ,STK0-ALLOC-ONLY))
-            (term (,PROG0
-                   void
-                   (store [,a0 (1 i32)]
+
+  ;; For tests that use STORE0-ALLOC-ONLY & MT-ENV & STK0-ALLOC-ONLY
+  (define (wrap-test test-exp)
+    (term (,PROG0 (in-call ,MT-MAIN ,test-exp) ,STORE0-ALLOC-ONLY ,MT-ENV ,STK0-ALLOC-ONLY)))
+  
+  (define (wrap-result result-exp result-store)
+    (term (,PROG0 (in-call ,MT-MAIN ,result-exp) ,result-store ,MT-ENV ,STK0-ALLOC-ONLY)))
+  
+  (test-->> run (wrap-test (term [bb 0 (let-vars ([= a (1 i32)])) return]))
+            (wrap-result (term void)
+                   (term (store [,a0 (1 i32)]
                           [,a1 void]
                           [,a2 void]
                           [,a3 void]
-                          [,a4 void])
-                   ,MT-ENV ,STK0-ALLOC-ONLY)))
+                          [,a4 void]))))
   (test-results))
 
 (define (statement-eval-tests)
@@ -370,10 +377,10 @@
 (test-results)
 
 (display "Function call tests: ")
-#;(function-call-tests)
+(function-call-tests)
 
 (display "Basic block tests: ")
-#;(bb-eval-tests)
+(bb-eval-tests)
 
 (display "Statement tests: ")
 (statement-eval-tests)

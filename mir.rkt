@@ -162,7 +162,8 @@
         "call main")
    ;; call function 
    (--> (prog (in-hole E (callfn g (rv ...))) σ ρ δ)
-        (prog (in-hole E (lookup-fn prog g)) σ_new ρ δ_new)
+        (prog (in-call (lookup-fn prog g) (in-hole E (lookup-fn prog g)))
+              σ_new ρ δ_new)
         (where (σ_new δ_new) (alloc-vars-in-fn (lookup-fn prog g) σ δ))
         "callfn")
    (--> (prog (in-call fn (in-hole E (g (x ...) bbs idx))) σ ρ δ)
@@ -435,14 +436,14 @@
   [(list-length (any_0 any_1 ...)) ,(add1 (term (list-length (any_1 ...))))])
 
 (define-metafunction mir-machine
-  get-stack : (prog v σ ρ δ) -> δ
+  get-stack : (prog any σ ρ δ) -> δ
   ;; Get the stack from the result of a reduction 
-  [(get-stack (prog v σ ρ δ)) δ])
+  [(get-stack (prog any σ ρ δ)) δ])
 
 (define-metafunction mir-machine
-  get-store : (prog v σ ρ δ) -> σ
+  get-store : (prog any σ ρ δ) -> σ
   ;; Get the store from the result of a reduction
-  [(get-store (prog v σ ρ δ)) σ])
+  [(get-store (prog any σ ρ δ)) σ])
 
 (define-metafunction mir-machine
   get-frame-contents : frame -> ([x α] ...)
