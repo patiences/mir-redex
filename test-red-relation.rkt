@@ -56,21 +56,19 @@
 (check-not-false (redex-match mir-machine σ STORE0))
 
 ;; Stack frames 
-(define MT-FRM (term (frm ,MT-MAIN ())))
-(define FRM0-ALLOC-ONLY (term (frm ,MT-MAIN
-                                   ([a ,a0]
-                                    [x ,a1]
-                                    [y ,a2]
-                                    [z ,a3]
-                                    [xyz ,a4]))))
+(define MT-FRM (term (frm)))
+(define FRM0-ALLOC-ONLY (term (frm [a ,a0]
+                                   [x ,a1]
+                                   [y ,a2]
+                                   [z ,a3]
+                                   [xyz ,a4])))
 (define FRM0 (term (frm
                     ; dummy function
-                    ,MT-MAIN
-                    ([a ,a0]
-                     [x ,a1]
-                     [y ,a2]
-                     [z ,a3]
-                     [xyz ,a4]))))
+                    [a ,a0]
+                    [x ,a1]
+                    [y ,a2]
+                    [z ,a3]
+                    [xyz ,a4])))
 (check-not-false (redex-match mir-machine frame MT-FRM))
 (check-not-false (redex-match mir-machine frame FRM0-ALLOC-ONLY))
 (check-not-false (redex-match mir-machine frame FRM0))
@@ -92,7 +90,7 @@
            (term (,PROG0 (callfn main ()) ,MT-STORE ,MT-ENV ,MT-STK)))
   (test-->> run PROG0
             (term (,PROG0 (in-call ,MT-MAIN void)
-                          ,MT-STORE ,MT-ENV (stk (frm ,MT-MAIN ())))))
+                          ,MT-STORE ,MT-ENV (stk (frm)))))
   
   (define result_1 (car (apply-reduction-relation* run PROG1))) ; unwrap outer list
   (define stack_1 (term (get-stack ,result_1)))
@@ -116,7 +114,7 @@
 
 (define (bb-eval-tests)
   ;; These tests deal with basic block execution and control flow within a function call.
-
+  
   ;; For tests that use STORE0-ALLOC-ONLY & MT-ENV & STK0-ALLOC-ONLY
   (define (wrap-test test-exp)
     (term (,PROG0 (in-call ,MT-MAIN ,test-exp) ,STORE0-ALLOC-ONLY ,MT-ENV ,STK0-ALLOC-ONLY)))
@@ -126,16 +124,16 @@
   
   (test-->> run (wrap-test (term [bb 0 (let-vars ([= a (1 i32)])) return]))
             (wrap-result (term void)
-                   (term (store [,a0 (1 i32)]
-                          [,a1 void]
-                          [,a2 void]
-                          [,a3 void]
-                          [,a4 void]))))
+                         (term (store [,a0 (1 i32)]
+                                      [,a1 void]
+                                      [,a2 void]
+                                      [,a3 void]
+                                      [,a4 void]))))
   (test-results))
 
 (define (statement-eval-tests)
   ;; These tests deal with single statement execution within a basic block.
-
+  
   ;; For tests that use STORE0-ALLOC-ONLY & MT-ENV & STK0-ALLOC-ONLY
   (define (wrap-test test-exp)
     (term (,PROG0 (in-call ,MT-MAIN ,test-exp) ,STORE0-ALLOC-ONLY ,MT-ENV ,STK0-ALLOC-ONLY)))
@@ -164,7 +162,7 @@
                                       [,a2 void]
                                       [,a3 void]
                                       [,a4 void]))))
-
+  
   ;; For tests that use STORE0 & MT-ENV & STK0
   (define (wrap exp)
     (term (,PROG0 (in-call ,MT-MAIN ,exp) ,STORE0 ,MT-ENV ,STK0)))
@@ -183,7 +181,7 @@
                           [,a4 (,a0 ,a2)])
                    ,MT-ENV ,STK0)))
   (test-->> run (wrap (term (let-vars ([= a (1 i32)] ; run multiple statements
-                                  [= (* x) (2 i32)]))))
+                                       [= (* x) (2 i32)]))))
             (term (,PROG0
                    (in-call ,MT-MAIN void)
                    (store [,a0 (1 i32)]
@@ -253,7 +251,7 @@
                                                 [,a1 void]
                                                 [,a2 void]
                                                 [,a3 void])))
-(define FRAME-WITH-AGGREGATE-VALUE (term (frm ,MT-MAIN ([x ,a0]))))
+(define FRAME-WITH-AGGREGATE-VALUE (term (frm [x ,a0])))
 (check-not-false (redex-match mir-machine σ STORE-WITH-AGGREGATE-VALUE))
 (check-not-false (redex-match mir-machine frame FRAME-WITH-AGGREGATE-VALUE))
 
@@ -342,9 +340,9 @@
 (test-equal (term (is-allocated new_variable ,(car alloc_new) ,(cadr alloc_new))) #t)
 
 ; variable already exists, don't allocate
-(define do_not_alloc_new (term (alloc-var old_variable (1 i32) (store (,a1 void)) (frm ,MT-MAIN ([old_variable ,a1])))))
+(define do_not_alloc_new (term (alloc-var old_variable (1 i32) (store (,a1 void)) (frm [old_variable ,a1]))))
 (test-equal do_not_alloc_new
-            (term ((store (,a1 void)) (frm ,MT-MAIN ([old_variable ,a1])))))
+            (term ((store (,a1 void)) (frm [old_variable ,a1]))))
 (test-equal (term (is-allocated old_variable ,(car do_not_alloc_new) ,(cadr do_not_alloc_new))) #t)
 
 ; allocate enough space for a tuple
@@ -367,8 +365,8 @@
 
 ;; is-allocated : x σ frame -> boolean
 ;; =========================================================
-(test-equal (term (is-allocated x (store (,a1 void)) (frm ,MT-MAIN ([x ,a1])))) #t) 
-(test-equal (term (is-allocated x (store) (frm ,MT-MAIN ()))) #f)
+(test-equal (term (is-allocated x (store (,a1 void)) (frm [x ,a1]))) #t) 
+(test-equal (term (is-allocated x (store) (frm))) #f)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
 ;; Run tests
