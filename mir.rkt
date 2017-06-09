@@ -133,6 +133,7 @@
      (α_0 α_1 ...))                    ;; aggregate values: keep addresses of contents
   ;; Evaluation contexts
   (E hole
+     (prog (in-call fn E) σ ρ δ)
      (prog E σ ρ δ)
      ;; basic blocks
      (bb idx E terminator)
@@ -164,52 +165,51 @@
         (prog (in-hole E (lookup-fn prog g)) σ_new ρ δ_new)
         (where (σ_new δ_new) (alloc-vars-in-fn (lookup-fn prog g) σ δ))
         "callfn")
-   (--> (prog (in-hole E (g (x ...) bbs idx)) σ ρ δ)
-        (prog (in-hole E (lookup-bb bbs idx)) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (g (x ...) bbs idx))) σ ρ δ)
+        (prog (in-call fn (in-hole E (lookup-bb bbs idx))) σ ρ δ)
         "run-bb-0")
    ;; basic block control flow
-   (--> (prog (in-hole E (bb idx void return)) σ ρ δ)
-        (prog (in-hole E void) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (bb idx void return))) σ ρ δ)
+        (prog (in-call fn (in-hole E void)) σ ρ δ) ;;FIXME handle return value
         "ret")
-   (--> (prog (in-hole E (bb idx void (goto idx_next))) σ ρ δ)
-        ;; for some reason this doesn't work if I pull it out into a where 
-        (prog (in-hole E (next-bb δ idx_next)) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (bb idx void (goto idx_next)))) σ ρ δ)
+        (prog (in-call fn (in-hole E (next-bb δ idx_next))) σ ρ δ)
         "goto")
    ;; Variable assignments
-   (--> (prog (in-hole E (let-vars (void ...))) σ ρ δ)
-        (prog (in-hole E void) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (let-vars (void ...)))) σ ρ δ)
+        (prog (in-call (in-hole E void)) σ ρ δ)
         "done-allocation")
-   (--> (prog (in-hole E (= x v)) σ ρ δ)
-        (prog (in-hole E void) (store-update σ δ x v) ρ δ)
+   (--> (prog (in-call fn (in-hole E (= x v))) σ ρ δ)
+        (prog (in-call fn (in-hole E void)) (store-update σ δ x v) ρ δ)
         "store-update-var")
-   (--> (prog (in-hole E (= α v)) σ ρ δ)
-        (prog (in-hole E void) (store-update-direct σ α v) ρ δ)
+   (--> (prog (in-call fn (in-hole E (= α v))) σ ρ δ)
+        (prog (in-call fn (in-hole E void)) (store-update-direct σ α v) ρ δ)
         "store-update-direct")
    ;; FIXME for now this will work for numbers (which are vs and also consts)
    ;; But this reduction relation should really work on consts (same as above)
-   (--> (prog (in-hole E (= x (v ...))) σ ρ δ) 
-        (prog (in-hole E void) (store-update-aggregate σ δ x (v ...)) ρ δ)
+   (--> (prog (in-call fn (in-hole E (= x (v ...)))) σ ρ δ) 
+        (prog (in-call fn (in-hole E void)) (store-update-aggregate σ δ x (v ...)) ρ δ)
         "store-update-aggregate")
    ;; Lvalues 
-   (--> (prog (in-hole E (* x)) σ ρ δ)
-        (prog (in-hole E (deref σ δ x)) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (* x))) σ ρ δ)
+        (prog (in-call fn (in-hole E (deref σ δ x))) σ ρ δ)
         "deref")
-   (--> (prog (in-hole E (· x f)) σ ρ δ)
-        (prog (in-hole E (deref-projection σ δ x f)) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (· x f))) σ ρ δ)
+        (prog (in-call fn (in-hole E (deref-projection σ δ x f))) σ ρ δ)
         "deref-projection")
    ;; Rvalues 
-   (--> (prog (in-hole E (use x_0)) σ ρ δ) 
-        (prog (in-hole E (deref σ δ x_0)) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (use x_0))) σ ρ δ) 
+        (prog (in-call fn (in-hole E (deref σ δ x_0))) σ ρ δ)
         "use")
-   (--> (prog (in-hole E (& borrowkind x_0)) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (& borrowkind x_0))) σ ρ δ)
         ; assuming x_0 is in the current stack frame
-        (prog (in-hole E (frm-lookup (list-ref δ 1) x_0)) σ ρ δ) 
+        (prog (in-call fn (in-hole E (frm-lookup (list-ref δ 1) x_0))) σ ρ δ) 
         "ref")
-   (--> (prog (in-hole E (binop const_1 const_2)) σ ρ δ)
-        (prog (in-hole E (eval-binop binop const_1 const_2)) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (binop const_1 const_2))) σ ρ δ)
+        (prog (in-call fn (in-hole E (eval-binop binop const_1 const_2))) σ ρ δ)
         "binop")
-   (--> (prog (in-hole E (unop const)) σ ρ δ)
-        (prog (in-hole E (eval-unop unop const)) σ ρ δ)
+   (--> (prog (in-call fn (in-hole E (unop const))) σ ρ δ)
+        (prog (in-call fn (in-hole E (eval-unop unop const))) σ ρ δ)
         "unop")))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -219,15 +219,15 @@
   deref : σ δ x -> v
   ;; Returns the value mapped to this variable in the store 
   [(deref σ δ x) (store-lookup σ α)
-                     (where frame (list-ref δ 1)) ; look in the first frame 
-                     (where α (frm-lookup frame x))])
+                 (where frame (list-ref δ 1)) ; look in the first frame 
+                 (where α (frm-lookup frame x))])
 
 (define-metafunction mir-machine
   deref-projection : σ δ x f -> v
   ;; Dereferences a projected value
   [(deref-projection σ δ x f) (store-lookup σ α_projected)                        
-                                  (where (α_0 ...) (deref σ δ x))
-                                  (where α_projected (list-ref (α_0 ...) f))])
+                              (where (α_0 ...) (deref σ δ x))
+                              (where α_projected (list-ref (α_0 ...) f))])
 
 (define-metafunction mir-machine
   list-ref : any idx -> any

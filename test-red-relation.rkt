@@ -91,7 +91,7 @@
   (test--> run PROG0
            (term (,PROG0 (callfn main ()) ,MT-STORE ,MT-ENV ,MT-STK)))
   (test-->> run PROG0
-            (term (,PROG0 void ,MT-STORE ,MT-ENV (stk (frm ,MT-MAIN ())))))
+            (term (,PROG0 (in-fn ,MT-MAIN void) ,MT-STORE ,MT-ENV (stk (frm ,MT-MAIN ())))))
   
   (define result_1 (car (apply-reduction-relation* run PROG1))) ; unwrap outer list
   (define stack_1 (term (get-stack ,result_1)))
@@ -200,29 +200,28 @@
 
 (define (rv-eval-tests)
   ;; These tests deal with rvalue evaluation.
-  ;; Rvalue reduction doesn't touch the PROG, so it's okay to use a mocked empty PROG. 
-  
-  (test-->> run (term (,PROG0 (use y) ,STORE0 ,MT-ENV ,STK0))
-            (term (,PROG0 (5 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0 (use z) ,STORE0 ,MT-ENV ,STK0))
-            (term (,PROG0 void ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0 (& mut x) ,STORE0 ,MT-ENV ,STK0))
-            (term (,PROG0 ,a1 ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0 (+ (1 i32) (2 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 (3 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0 (- (4 i32) (-20 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 (24 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0 (* (5 i32) (6 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 (30 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0 (< (1 i32) (2 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 #t ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0 (% (-10 i32) (3 i32)) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 (-1 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test--> run (term (,PROG0 (! #t) ,STORE0 ,MT-ENV ,STK0)) (term (,PROG0 #f ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run
-            (term (,PROG0 (+ (use y) (1 i32)) ,STORE0 ,MT-ENV ,STK0)) ; y + 1
-            (term (,PROG0 (6 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run
-            (term (,PROG0 (+ (1 i32) (use y)) ,STORE0 ,MT-ENV ,STK0)) ; 1 + y
-            (term (,PROG0 (6 i32) ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run
-            (term (,PROG0 (+ (use y) (use y)) ,STORE0 ,MT-ENV ,STK0))
-            (term (,PROG0 (10 i32) ,STORE0 ,MT-ENV ,STK0)))
+  ;; Rvalue reduction doesn't touch the PROG, so it's okay to use a mocked empty PROG.
+  (define (wrap exp)
+    (term (,PROG0 (in-call ,MT-MAIN ,exp) ,STORE0 ,MT-ENV ,STK0)))
+
+  (test-->> run (wrap (term (use y))) (wrap (term (5 i32))))
+  (test-->> run (wrap (term (use z))) (wrap (term void)))
+  (test-->> run (wrap (term (& mut x))) (wrap a1))
+  (test-->> run (wrap (term (+ (1 i32) (2 i32))))
+            (wrap (term (3 i32))))
+  (test-->> run (wrap (term (- (4 i32) (-20 i32))))
+            (wrap (term (24 i32))))
+  (test-->> run (wrap (term (* (5 i32) (6 i32))))
+            (wrap (term (30 i32))))
+  (test-->> run (wrap (term (< (1 i32) (2 i32)))) (wrap #t))
+  (test-->> run (wrap (term (% (-10 i32) (3 i32))))
+            (wrap (term (-1 i32))))
+  (test-->> run (wrap (term (! #t))) (wrap (term #f)))
+  (test-->> run (wrap (term (+ (use y) (1 i32)))) 
+            (wrap (term (6 i32))))
+  (test-->> run (wrap (term (+ (1 i32) (use y))))
+            (wrap (term (6 i32))))
+  (test-->> run (wrap (term (+ (use y) (use y)))) (wrap (term (10 i32))))
   (test-results))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; 
@@ -382,13 +381,13 @@
 (test-results)
 
 (display "Function call tests: ")
-(function-call-tests)
+#;(function-call-tests)
 
 (display "Basic block tests: ")
-(bb-eval-tests)
+#;(bb-eval-tests)
 
 (display "Statement tests: ")
-(statement-eval-tests)
+#;(statement-eval-tests)
 
 (display "Rvalue tests: ")
 (rv-eval-tests)
