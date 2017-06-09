@@ -128,68 +128,57 @@
 
 (define (statement-eval-tests)
   ;; These tests deal with single statement execution within a basic block.
-  (test-->> run (term (,PROG0
-                       (bb 0 (let-vars [(= a (1 i32))]) return)
-                       ,STORE0-ALLOC-ONLY ,MT-ENV ,STK0-ALLOC-ONLY))
+
+  ;; For tests that use STORE0-ALLOC-ONLY & MT-ENV & STK0-ALLOC-ONLY
+  (define (wrap-test test-exp)
+    (term (,PROG0 (in-call ,MT-MAIN ,test-exp) ,STORE0-ALLOC-ONLY ,MT-ENV ,STK0-ALLOC-ONLY)))
+  
+  (define (wrap-result result-exp result-store)
+    (term (,PROG0 (in-call ,MT-MAIN ,result-exp) ,result-store ,MT-ENV ,STK0-ALLOC-ONLY)))
+  
+  (test-->> run (wrap-test (term (bb 0 (let-vars [(= a (1 i32))]) return)))
+            (wrap-result (term void)
+                         (term (store [,a0 (1 i32)]
+                                      [,a1 void]
+                                      [,a2 void]
+                                      [,a3 void]
+                                      [,a4 void]))))
+  (test-->> run (wrap-test (term (= a (1 i32))))
+            (wrap-result (term void)
+                         (term (store [,a0 (1 i32)]
+                                      [,a1 void]
+                                      [,a2 void]
+                                      [,a3 void]
+                                      [,a4 void]))))
+  (test-->> run (wrap-test (term (= a (+ (1 i32) (1 i32)))))
+            (wrap-result (term void)
+                         (term (store [,a0 (2 i32)]
+                                      [,a1 void]
+                                      [,a2 void]
+                                      [,a3 void]
+                                      [,a4 void]))))
+
+  ;; For tests that use STORE0 & MT-ENV & STK0
+  (define (wrap exp)
+    (term (,PROG0 (in-call ,MT-MAIN ,exp) ,STORE0 ,MT-ENV ,STK0)))
+  
+  (test-->> run (wrap (term (* x)))
+            (wrap (term,a2)))
+  (test-->> run (wrap (term (· xyz 1)))
+            (wrap (term (5 i32))))
+  (test-->> run (wrap (term (= (* x) (1 i32))))       ; *x = 1 
             (term (,PROG0
-                   void
-                   (store [,a0 (1 i32)]
-                          [,a1 void]
-                          [,a2 void]
-                          [,a3 void]
-                          [,a4 void])
-                   ,MT-ENV ,STK0-ALLOC-ONLY)))
-  (test-->> run (term (,PROG0
-                       (= a (1 i32))
-                       ,STORE0-ALLOC-ONLY ,MT-ENV ,STK0-ALLOC-ONLY))
-            (term (,PROG0
-                   void
-                   (store [,a0 (1 i32)]
-                          [,a1 void]
-                          [,a2 void]
-                          [,a3 void]
-                          [,a4 void])
-                   ,MT-ENV ,STK0-ALLOC-ONLY)))
-  (test-->> run (term (,PROG0
-                       (= a (+ (1 i32) (1 i32)))
-                       ,STORE0-ALLOC-ONLY ,MT-ENV ,STK0-ALLOC-ONLY))
-            (term (,PROG0
-                   void
-                   (store [,a0 (2 i32)]
-                          [,a1 void]
-                          [,a2 void]
-                          [,a3 void]
-                          [,a4 void])
-                   ,MT-ENV ,STK0-ALLOC-ONLY)))
-  (test-->> run (term (,PROG0
-                       (* x)
-                       ,STORE0 ,MT-ENV ,STK0))
-            (term (,PROG0
-                   ,a2
-                   ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0
-                       (· xyz 1)
-                       ,STORE0 ,MT-ENV ,STK0))
-            (term (,PROG0
-                   (5 i32)
-                   ,STORE0 ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0
-                       (= (* x) (1 i32))       ; *x = 1 
-                       ,STORE0 ,MT-ENV ,STK0)) 
-            (term (,PROG0
-                   void
+                   (in-call ,MT-MAIN void)
                    (store [,a0 void]
                           [,a1 ,a2]
                           [,a2 (1 i32)] ; *x
                           [,a3 void]
                           [,a4 (,a0 ,a2)])
                    ,MT-ENV ,STK0)))
-  (test-->> run (term (,PROG0
-                       (let-vars ([= a (1 i32)] ; run multiple statements
-                                  [= (* x) (2 i32)]))
-                       ,STORE0 ,MT-ENV ,STK0))
+  (test-->> run (wrap (term (let-vars ([= a (1 i32)] ; run multiple statements
+                                  [= (* x) (2 i32)]))))
             (term (,PROG0
-                   void
+                   (in-call ,MT-MAIN void)
                    (store [,a0 (1 i32)]
                           [,a1 ,a2]
                           [,a2 (2 i32)] ; *x
@@ -203,7 +192,7 @@
   ;; Rvalue reduction doesn't touch the PROG, so it's okay to use a mocked empty PROG.
   (define (wrap exp)
     (term (,PROG0 (in-call ,MT-MAIN ,exp) ,STORE0 ,MT-ENV ,STK0)))
-
+  
   (test-->> run (wrap (term (use y))) (wrap (term (5 i32))))
   (test-->> run (wrap (term (use z))) (wrap (term void)))
   (test-->> run (wrap (term (& mut x))) (wrap a1))
@@ -387,7 +376,7 @@
 #;(bb-eval-tests)
 
 (display "Statement tests: ")
-#;(statement-eval-tests)
+(statement-eval-tests)
 
 (display "Rvalue tests: ")
 (rv-eval-tests)

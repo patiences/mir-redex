@@ -177,7 +177,7 @@
         "goto")
    ;; Variable assignments
    (--> (prog (in-call fn (in-hole E (let-vars (void ...)))) σ ρ δ)
-        (prog (in-call (in-hole E void)) σ ρ δ)
+        (prog (in-call fn (in-hole E void)) σ ρ δ)
         "done-allocation")
    (--> (prog (in-call fn (in-hole E (= x v))) σ ρ δ)
         (prog (in-call fn (in-hole E void)) (store-update σ δ x v) ρ δ)
