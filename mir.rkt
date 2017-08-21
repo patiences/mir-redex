@@ -191,6 +191,10 @@
    (--> (prog (in-call fn (in-hole E (bb idx void (assert const boolean idx_next msg)))) σ ρ δ)
         (prog msg σ ρ δ)
         "checked-branch-error")
+   (--> (prog (in-call fn (in-hole E (bb idx void (drop x idx_next)))) σ ρ δ)
+        (prog (in-call fn (in-hole E (next-bb fn idx_next))) σ_new ρ δ_new)
+        (where (σ_new δ_new) (drop-var x σ δ)) 
+        "drop")
    ;; Variable assignments
    (--> (prog (in-call fn (in-hole E (let-vars (void ...)))) σ ρ δ)
         (prog (in-call fn (in-hole E void)) σ ρ δ)
@@ -372,6 +376,22 @@
                  (frm _ ... (x_0 α_0) _ ...))
    #t]
   [(is-allocated x σ frame) #f])
+
+(define-metafunction mir-machine
+  drop-var : x σ δ -> (σ δ)
+  ;; Removes the variable mapping in the heap and the stack
+  [(drop-var x σ (stk frame_0 frame_1 ...))
+   (σ_new (stk frame_new frame_1 ...))
+   (where (σ_new frame_new) (drop-var-frame x σ frame_0))])
+  
+(define-metafunction mir-machine
+  drop-var-frame : x σ frame -> (σ frame)
+  ;; Removes the variable mapping in the heap and stack frame
+  [(drop-var-frame x_0
+            (store (α_1 v_1) ... (α_0 v_0) (α_2 v_2) ...)
+            (frm (x_3 α_3) ... (x_0 α_0) (x_4 α_4) ...))
+  ((store (α_1 v_1) ... (α_2 v_2) ...) (frm (x_3 α_3) ... (x_4 α_4) ...))]
+  [(drop-var-frame x_0 σ frame) ,(error "drop-var: variable not found" (term x))])
 
 (define-metafunction mir-machine
   eval-binop : binop const const -> const

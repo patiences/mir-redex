@@ -59,6 +59,10 @@
                                         [bb 1 (let-vars ([= y (42 i32)])) return]))
                            0)]))
 
+(define PROG5 (term [(main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) (drop x 1)]
+                                        [bb 1 (let-vars ([= y (2 i32)])) return]))
+                           0)]))
+
 (check-not-false (redex-match mir-machine prog PROG0))
 (check-not-false (redex-match mir-machine prog PROG1))
 (check-not-false (redex-match mir-machine prog PROG2))
@@ -66,6 +70,7 @@
 (check-not-false (redex-match mir-machine prog PROG3b))
 (check-not-false (redex-match mir-machine prog PROG4a))
 (check-not-false (redex-match mir-machine prog PROG4b))
+(check-not-false (redex-match mir-machine prog PROG5))
 
 ;; Environments 
 (define MT-ENV (term (env)))
@@ -172,7 +177,14 @@
   (define result_4b (car (apply-reduction-relation* run PROG4b)))
   (define ret-val (term (get-return-value-from-reduction ,result_4b)))
   (test-equal "Assertion failed" ret-val)
-  
+
+  (define result_5 (car (apply-reduction-relation* run PROG5)))
+  (define stack_5 (term (get-stack ,result_5)))
+  (define frame_5 (term (list-ref ,stack_5 1)))
+  (define store_5 (term (get-store ,result_5)))
+  (test-equal (term (is-allocated x ,store_5 ,frame_5)) #f)
+  (test-equal (term (is-allocated y ,store_5 ,frame_5)) #t)
+
   (test-results))
 
 (define (bb-eval-tests)
@@ -436,6 +448,11 @@
 ;; =========================================================
 (test-equal (term (is-allocated x (store (,a1 void)) (frm [x ,a1]))) #t) 
 (test-equal (term (is-allocated x (store) (frm))) #f)
+
+;; drop-var : x σ δ -> (σ δ)
+;; =========================================================
+(test-equal (term (drop-var x (store (,a1 void)) (stk (frm (x ,a1)))))
+            (term ((store) (stk (frm)))))
 
 ;; lookup-next-bb-idx : (switchInt const (const idx) ... (otherwise idx)
 ;; =========================================================
