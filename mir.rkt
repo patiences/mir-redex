@@ -42,7 +42,7 @@
                          (const idx) ...
                          (otherwise idx))
               (assert operand boolean idx msg)    ;; checked branch
-              ;;    rv: condition
+              ;;    operand: condition
               ;;    idx: index of block to branch to, if rv evals to true
               ;;    msg: error message, if rv evals to false
               (assert operand boolean idx idx msg);; as above, with extra unwinding label 
@@ -130,6 +130,7 @@
   ;; store values 
   (v α                                 ;; pointer
      typed-num                         ;; numerical value
+     boolean 
      void                              ;; void (uninitialized)
      (α_0 α_1 ...))                    ;; aggregate values: keep addresses of contents
   ;; Evaluation contexts
@@ -138,6 +139,7 @@
      (prog E σ ρ δ)
      ;; basic blocks
      (bb idx E terminator)
+     (bb idx void (assert E boolean idx msg))
      (bb idx void (switchInt E (const idx_1) ... (otherwise idx_2)))
      ;; variable statements
      (let-vars E)
@@ -182,6 +184,13 @@
         (prog (in-call fn (in-hole E (next-bb fn (lookup-next-bb-idx (switchInt const_0 (const_1 idx_1) ... (otherwise idx_2))))))
               σ ρ δ)
         "switchInt")
+   (--> (prog (in-call fn (in-hole E (bb idx void (assert const boolean idx_next msg)))) σ ρ δ)
+        (prog (in-call fn (in-hole E (next-bb fn idx_next))) σ ρ δ)
+        (side-condition (equal? (term const) (term boolean)))
+        "checked-branch-ok")
+   (--> (prog (in-call fn (in-hole E (bb idx void (assert const boolean idx_next msg)))) σ ρ δ)
+        (prog msg σ ρ δ)
+        "checked-branch-error")
    ;; Variable assignments
    (--> (prog (in-call fn (in-hole E (let-vars (void ...)))) σ ρ δ)
         (prog (in-call fn (in-hole E void)) σ ρ δ)

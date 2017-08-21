@@ -51,9 +51,21 @@
                                         [bb 2 (let-vars ()) return]))
                            0])))
 
+(define PROG4a (term [(main () (let-bbs ([bb 0 (let-vars ([= x #t])) (assert (use x) #t 1 "Assertion failed")]
+                                        [bb 1 (let-vars ([= y (42 i32)])) return]))
+                           0)]))
+
+(define PROG4b (term [(main () (let-bbs ([bb 0 (let-vars ([= x #f])) (assert (use x) #t 1 "Assertion failed")]
+                                        [bb 1 (let-vars ([= y (42 i32)])) return]))
+                           0)]))
+
 (check-not-false (redex-match mir-machine prog PROG0))
 (check-not-false (redex-match mir-machine prog PROG1))
 (check-not-false (redex-match mir-machine prog PROG2))
+(check-not-false (redex-match mir-machine prog PROG3a))
+(check-not-false (redex-match mir-machine prog PROG3b))
+(check-not-false (redex-match mir-machine prog PROG4a))
+(check-not-false (redex-match mir-machine prog PROG4b))
 
 ;; Environments 
 (define MT-ENV (term (env)))
@@ -146,6 +158,20 @@
   (define store_3b (term (get-store ,result_3b)))
   (test-equal (term (store-lookup ,store_3b (frm-lookup ,frame_3b foo))) (term void)) ;; block 1 did not run 
   (test-equal (term (store-lookup ,store_3b (frm-lookup ,frame_3b bar))) (term void)) ;; block 1 did not run
+
+  (define result_4a (car (apply-reduction-relation* run PROG4a)))
+  (define stack_4a (term (get-stack ,result_4a)))
+  (define frame_4a (term (list-ref ,stack_4a 1)))
+  (define store_4a (term (get-store ,result_4a)))
+  (test-equal (term (size ,stack_4a)) 1) ;; 1 frame created
+  (test-equal (term (size ,frame_4a)) 3) ;; 2 variables in the frame + return pointer
+  (test-equal (term (size ,store_4a)) 3) ;; 2 blocks of memory allocated + return value 
+  (test-equal (term (is-allocated x ,store_4a ,frame_4a)) #t)
+  (test-equal (term (is-allocated y ,store_4a ,frame_4a)) #t) ; bb1 was executed
+
+  (define result_4b (car (apply-reduction-relation* run PROG4b)))
+  (define ret-val (term (get-return-value-from-reduction ,result_4b)))
+  (test-equal "Assertion failed" ret-val)
   
   (test-results))
 
