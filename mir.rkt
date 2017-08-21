@@ -46,8 +46,8 @@
               ;;    idx: index of block to branch to, if rv evals to true
               ;;    msg: error message, if rv evals to false
               (assert operand boolean idx idx msg);; as above, with extra unwinding label 
-              (call lv g rvs idx)                 ;; lv gets the result of calling g(rvs), branch to l on return  
-              (call lv g rvs idx idx)             ;; as above, with extra unwinding label  
+              (call lv g (operand ...) idx)       ;; lv gets the result of calling g(rvs), branch to l on return  
+              (call lv g (operand ...) idx idx)   ;; as above, with extra unwinding label  
               (goto idx)                          ;; goto l
               (drop lv idx)                       ;; drop lv, goto l 
               (drop lv idx idx))                  ;; as above, with extra unwinding label
