@@ -59,11 +59,6 @@
                                         [bb 1 (let-vars ([= y (42 i32)])) return]))
                            0)]))
 
-(define PROG5 (term ([main () (let-bbs ([bb 0 (let-vars ([= return-ptr (0 i32)])) (call x foo ((5 i32)) 1)]
-                                        [bb 1 (let-vars ([= unused-var (42 i32)])) return]))
-                     0]
-                     [foo (n) (let-bbs ([bb 0 (let-vars ([= return-ptr (+ (use n) (1 i32))])) return])) 0])))
-
 (check-not-false (redex-match mir-machine prog PROG0))
 (check-not-false (redex-match mir-machine prog PROG1))
 (check-not-false (redex-match mir-machine prog PROG2))
@@ -71,7 +66,6 @@
 (check-not-false (redex-match mir-machine prog PROG3b))
 (check-not-false (redex-match mir-machine prog PROG4a))
 (check-not-false (redex-match mir-machine prog PROG4b))
-(check-not-false (redex-match mir-machine prog PROG5))
 
 ;; Environments 
 (define MT-ENV (term (env)))
