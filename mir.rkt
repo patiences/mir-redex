@@ -46,7 +46,7 @@
               ;;    idx: index of block to branch to, if rv evals to true
               ;;    msg: error message, if rv evals to false
               (assert operand boolean idx idx msg);; as above, with extra unwinding label 
-              (call lv g (operand ...) idx)       ;; lv gets the result of calling g(rvs), branch to l on return  
+              (call lv g (operand ...) idx)       ;; lv gets the result of calling g(operands ...), branch to l on return  
               (call lv g (operand ...) idx idx)   ;; as above, with extra unwinding label  
               (goto idx)                          ;; goto l
               (drop lv idx)                       ;; drop lv, goto l 
@@ -58,7 +58,6 @@
       (* lv))                                     ;; pointer deref
   
   ;; rvalue
-  (rvs (rv ...))
   (rv (use lv)                                    ;; use lv  
       (& borrowkind lv)                           ;; references (borrows)
       const                                       ;; constants
@@ -141,6 +140,7 @@
      (bb idx E terminator)
      (bb idx void (assert E boolean idx msg))
      (bb idx void (switchInt E (const idx_1) ... (otherwise idx_2)))
+     (bb idx void (call lv g (operand ...) idx))
      ;; variable statements
      (let-vars E)
      (void ... E (= lv rv) ...)
@@ -165,7 +165,7 @@
         (prog (callfn main ()) (store) (env) (stk))
         "call main")
    ;; call function 
-   (--> (prog (in-hole E (callfn g (rv ...))) σ ρ δ)
+   (--> (prog (in-hole E (callfn g (operand ...))) σ ρ δ)
         (prog (in-call (lookup-fn prog g) (in-hole E (lookup-fn prog g)))
               σ_new ρ δ_new)
         (where (σ_new δ_new) (alloc-vars-in-fn (lookup-fn prog g) σ δ))
@@ -190,7 +190,31 @@
         "checked-branch-ok")
    (--> (prog (in-call fn (in-hole E (bb idx void (assert const boolean idx_next msg)))) σ ρ δ)
         (prog msg σ ρ δ)
-        "checked-branch-error")
+        "checked-branch-error")   
+;   (--> (prog (in-call fn (in-hole E (bb idx void (call lv g (operand ...) idx)))))
+;        (prog (in-call fn (in-hole E (bb
+;                                      idx
+;                                      (let-vars ([= lv (get-return-value-from-reduction (prog (callfn g (operand ...)) (store) (env) (stk)))]))
+;                                      (goto idx_next))))
+;              σ ρ δ)
+;        "call")
+   
+;   (--> (prog (in-call fn (in-hole E (bb idx void (call lv g (operand ...) idx)))))
+;        (prog (in-call fn (in-hole E (bb
+;                                      idx
+;                                      (let-vars ([= lv (get-return-value-from-reduction (prog (in-hole E (callfn g (operand ...))) (store) (env) (stk)))]))
+;                                      (goto idx_next))))
+;              σ ρ δ)
+;        "call")
+
+;   (--> (prog (in-call fn (in-hole E (bb idx void (call lv g (operand ...) idx)))))
+;        (prog (in-call fn (in-hole E (bb
+;                                      idx
+;                                      (let-vars ([= lv return-val]))
+;                                      (goto idx_next))))
+;              σ ρ δ)
+;        (where return-val (get-return-value-from-reduction (prog (in-hole E (callfn g (operand ...))) (store) (env) (stk))))
+;        "call")
    ;; Variable assignments
    (--> (prog (in-call fn (in-hole E (let-vars (void ...)))) σ ρ δ)
         (prog (in-call fn (in-hole E void)) σ ρ δ)
