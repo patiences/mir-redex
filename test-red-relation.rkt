@@ -17,13 +17,13 @@
 ;; Programs and functions 
 (define MT-MAIN (term [main () (let-bbs ([bb 0 (let-vars ()) return])) 0]))
 (define PROG0 (term (,MT-MAIN)))
-(define PROG1 (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
+(define PROG-WITH-SIMPLE-ASSN (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
                                                          [= y (use x)]
                                                          [= z ((100 i32) (200 i32) (300 i32))]))
                                             return]))
                            0])))
 
-(define PROG2 (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
+(define PROG-WITH-GOTO (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
                                                          [= y (use x)]
                                                          [= z ((100 i32) (200 i32) (300 i32))]))
                                             (goto 1)]
@@ -31,7 +31,7 @@
                                                          [= bar (42 i32)]))
                                             return]))
                            0])))
-(define PROG3a (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
+(define PROG-WITH-SWITCH-INT-SIMPLE (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
                                                          [= y (use x)]
                                                          [= z ((100 i32) (200 i32) (300 i32))]))
                                             (switchInt (1 i32) ((1 i32) 1) (otherwise 2))]
@@ -41,7 +41,7 @@
                                         [bb 2 (let-vars ()) return]))
                            0])))
 
-(define PROG3b (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
+(define PROG-WITH-SWITCH-INT (term ([main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)]
                                                          [= y (use x)]
                                                          [= z ((100 i32) (200 i32) (300 i32))]))
                                             (switchInt (use (· z 1)) ((1 i32) 1) (otherwise 2))]
@@ -51,26 +51,26 @@
                                         [bb 2 (let-vars ()) return]))
                            0])))
 
-(define PROG4a (term [(main () (let-bbs ([bb 0 (let-vars ([= x #t])) (assert (use x) #t 1 "Assertion failed")]
+(define PROG-WITH-ASSERTION (term [(main () (let-bbs ([bb 0 (let-vars ([= x #t])) (assert (use x) #t 1 "Assertion failed")]
                                         [bb 1 (let-vars ([= y (42 i32)])) return]))
                            0)]))
 
-(define PROG4b (term [(main () (let-bbs ([bb 0 (let-vars ([= x #f])) (assert (use x) #t 1 "Assertion failed")]
+(define PROG-WITH-FAILED-ASSERTION (term [(main () (let-bbs ([bb 0 (let-vars ([= x #f])) (assert (use x) #t 1 "Assertion failed")]
                                         [bb 1 (let-vars ([= y (42 i32)])) return]))
                            0)]))
 
-(define PROG5 (term [(main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) (drop x 1)]
+(define PROG-WITH-DROP (term [(main () (let-bbs ([bb 0 (let-vars ([= x (1 i32)])) (drop x 1)]
                                         [bb 1 (let-vars ([= y (2 i32)])) return]))
                            0)]))
 
 (check-not-false (redex-match mir-machine prog PROG0))
-(check-not-false (redex-match mir-machine prog PROG1))
-(check-not-false (redex-match mir-machine prog PROG2))
-(check-not-false (redex-match mir-machine prog PROG3a))
-(check-not-false (redex-match mir-machine prog PROG3b))
-(check-not-false (redex-match mir-machine prog PROG4a))
-(check-not-false (redex-match mir-machine prog PROG4b))
-(check-not-false (redex-match mir-machine prog PROG5))
+(check-not-false (redex-match mir-machine prog PROG-WITH-SIMPLE-ASSN))
+(check-not-false (redex-match mir-machine prog PROG-WITH-GOTO))
+(check-not-false (redex-match mir-machine prog PROG-WITH-SWITCH-INT-SIMPLE))
+(check-not-false (redex-match mir-machine prog PROG-WITH-SWITCH-INT))
+(check-not-false (redex-match mir-machine prog PROG-WITH-ASSERTION))
+(check-not-false (redex-match mir-machine prog PROG-WITH-FAILED-ASSERTION))
+(check-not-false (redex-match mir-machine prog PROG-WITH-DROP))
 
 ;; Environments 
 (define MT-ENV (term (env)))
@@ -132,7 +132,7 @@
   (define result (term (get-return-value-from-reduction ,result_0)))
   (test-equal result (term void))
   
-  (define result_1 (car (apply-reduction-relation* run PROG1))) ; unwrap outer list
+  (define result_1 (car (apply-reduction-relation* run PROG-WITH-SIMPLE-ASSN))) ; unwrap outer list
   (define stack_1 (term (get-stack ,result_1)))
   (define frame_1 (term (list-ref ,stack_1 1)))
   (define store_1 (term (get-store ,result_1)))
@@ -143,28 +143,28 @@
   (test-equal (term (is-allocated y ,store_1 ,frame_1)) #t)
   (test-equal (term (is-allocated z ,store_1 ,frame_1)) #t)
   
-  (define result_2 (car (apply-reduction-relation* run PROG2)))
+  (define result_2 (car (apply-reduction-relation* run PROG-WITH-GOTO)))
   (define stack_2 (term (get-stack ,result_2)))
   (define frame_2 (term (list-ref ,stack_2 1)))
   (define store_2 (term (get-store ,result_2)))
   (test-equal (term (size ,stack_2)) 1)
   (test-equal (term (size ,frame_2)) 6)
 
-  (define result_3a (car (apply-reduction-relation* run PROG3a)))
+  (define result_3a (car (apply-reduction-relation* run PROG-WITH-SWITCH-INT-SIMPLE)))
   (define stack_3a (term (get-stack ,result_3a)))
   (define frame_3a (term (list-ref ,stack_3a 1)))
   (define store_3a (term (get-store ,result_3a)))
   (test-equal (term (store-lookup ,store_3a (frm-lookup ,frame_3a foo))) (term (1 i32))) ;; block 1 ran 
   (test-equal (term (store-lookup ,store_3a (frm-lookup ,frame_3a bar))) (term (42 i32)));; block 1 ran
 
-  (define result_3b (car (apply-reduction-relation* run PROG3b)))
+  (define result_3b (car (apply-reduction-relation* run PROG-WITH-SWITCH-INT)))
   (define stack_3b (term (get-stack ,result_3b)))
   (define frame_3b (term (list-ref ,stack_3b 1)))
   (define store_3b (term (get-store ,result_3b)))
   (test-equal (term (store-lookup ,store_3b (frm-lookup ,frame_3b foo))) (term void)) ;; block 1 did not run 
   (test-equal (term (store-lookup ,store_3b (frm-lookup ,frame_3b bar))) (term void)) ;; block 1 did not run
 
-  (define result_4a (car (apply-reduction-relation* run PROG4a)))
+  (define result_4a (car (apply-reduction-relation* run PROG-WITH-ASSERTION)))
   (define stack_4a (term (get-stack ,result_4a)))
   (define frame_4a (term (list-ref ,stack_4a 1)))
   (define store_4a (term (get-store ,result_4a)))
@@ -174,11 +174,11 @@
   (test-equal (term (is-allocated x ,store_4a ,frame_4a)) #t)
   (test-equal (term (is-allocated y ,store_4a ,frame_4a)) #t) ; bb1 was executed
 
-  (define result_4b (car (apply-reduction-relation* run PROG4b)))
+  (define result_4b (car (apply-reduction-relation* run PROG-WITH-FAILED-ASSERTION)))
   (define ret-val (term (get-return-value-from-reduction ,result_4b)))
   (test-equal "Assertion failed" ret-val)
 
-  (define result_5 (car (apply-reduction-relation* run PROG5)))
+  (define result_5 (car (apply-reduction-relation* run PROG-WITH-DROP)))
   (define stack_5 (term (get-stack ,result_5)))
   (define frame_5 (term (list-ref ,stack_5 1)))
   (define store_5 (term (get-store ,result_5)))
